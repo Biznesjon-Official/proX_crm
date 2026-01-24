@@ -5,7 +5,7 @@ import { TrendingUp, FileText, Crown, Sparkles, Zap, Calendar, Award, Building2,
 import { useAuth } from "../hooks/useAuth";
 import api from "@/lib/axios";
 
-type UserRole = 'super_admin' | 'branch_manager' | 'head_teacher' | 'student';
+type UserRole = 'super_admin' | 'student';
 
 export default function StudentProfile() {
   const { user } = useAuth();

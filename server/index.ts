@@ -8,7 +8,9 @@ import studentProgressRouter from './routes/student-progress.js';
 import progressMongoRouter from './routes/progress-mongo.js';
 import paymentsMongoRouter from './routes/payments-mongo.js';
 import authRouter from './routes/auth.js';
+// import backupRouter from './routes/backup.js'; // TODO: Fix export issue
 import { startPaymentScheduler } from './utils/paymentScheduler.js';
+import { scheduleBackups } from './utils/backup.js';
 import mongoose from 'mongoose';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +38,9 @@ export async function createServer() {
 
   // To'lov scheduler'ni ishga tushirish
   startPaymentScheduler();
+
+  // Backup scheduler'ni ishga tushirish
+  scheduleBackups();
 
   // MongoDB ulanishini tekshirish va qayta ulanish middleware
   app.use(async (req, res, next) => {
@@ -66,6 +71,7 @@ export async function createServer() {
   app.use('/api/progress', progressMongoRouter); // MongoDB progress
   app.use('/api/progress-mongo', progressMongoRouter); // Backward compatibility
   app.use('/api/payments', paymentsMongoRouter); // MongoDB payments
+  // app.use('/api/backup', backupRouter); // Backup system - TODO: Fix export issue
 
   // Health check
   app.get('/api/health', (_req, res) => {

@@ -1,7 +1,11 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Building2, Users, BarChart3, TrendingUp, DollarSign, Menu, X, LogOut, User, CheckCircle } from "lucide-react";
+import { Building2, Users, BarChart3, TrendingUp, DollarSign, Menu, X, LogOut, User, CheckCircle, Database, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useBranchContext } from "../hooks/useBranchContext";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/axios";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface MenuItem {
   title: string;
@@ -11,12 +15,14 @@ interface MenuItem {
 }
 
 const allMenuItems: MenuItem[] = [
-  { title: "Dashboard", icon: BarChart3, path: "/", roles: ['super_admin', 'branch_manager', 'manager'] },
+  { title: "Dashboard", icon: BarChart3, path: "/", roles: ['super_admin', 'manager'] },
   { title: "Filiallar", icon: Building2, path: "/branches", roles: ['super_admin'] },
-  { title: "O'quvchilar", icon: Users, path: "/students", roles: ['super_admin', 'branch_manager', 'mentor', 'manager'] },
-  { title: "Qadam Belgilash", icon: TrendingUp, path: "/student-progress", roles: ['super_admin', 'branch_manager', 'mentor', 'manager'] },
-  { title: "Qadam Topshirish", icon: CheckCircle, path: "/student-open-steps", roles: ['super_admin', 'branch_manager', 'mentor', 'manager'] },
-  { title: "To'lovlar", icon: DollarSign, path: "/payments", roles: ['super_admin', 'branch_manager', 'manager'] },
+  { title: "O'quvchilar", icon: Users, path: "/students", roles: ['super_admin', 'mentor', 'manager'] },
+  { title: "Qadam Belgilash", icon: TrendingUp, path: "/student-progress", roles: ['super_admin', 'mentor', 'manager'] },
+  { title: "Qadam Topshirish", icon: CheckCircle, path: "/student-open-steps", roles: ['super_admin', 'mentor', 'manager'] },
+  { title: "O'quvchi Tekshirish", icon: BookOpen, path: "/student-exam", roles: ['super_admin', 'mentor', 'manager'] },
+  { title: "To'lovlar", icon: DollarSign, path: "/payments", roles: ['super_admin', 'manager'] },
+  { title: "Backup", icon: Database, path: "/backup", roles: ['super_admin'] },
   { title: "Profil", icon: User, path: "/student-profile", roles: ['student'] },
 ];
 
@@ -25,6 +31,13 @@ export default function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { selectedBranch, setSelectedBranch, clearSelectedBranch } = useBranchContext();
+  
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches-mongo'],
+    queryFn: () => api.get('/branches-mongo').then(res => res.data),
+    enabled: user?.role === 'super_admin' || user?.role === 'manager'
+  });
   
   const menuItems = allMenuItems.filter(item => {
     if (!item.roles) return true;
@@ -123,6 +136,53 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
+        {/* Branch Selector Header - Only for super_admin and manager */}
+        {(user?.role === 'super_admin' || user?.role === 'manager') && (
+          <div className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 p-3 sm:p-4">
+            <div className="flex items-center gap-3">
+              <Building2 className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+              <Select 
+                value={selectedBranch?.id || "all"} 
+                onValueChange={(value) => {
+                  if (value === "all") {
+                    clearSelectedBranch();
+                  } else {
+                    const branch = branches.find((b: any) => (b.id || b._id) === value);
+                    if (branch) {
+                      setSelectedBranch({
+                        id: branch.id || branch._id,
+                        name: branch.name,
+                        district: branch.district,
+                        address: branch.address,
+                        phone: branch.phone,
+                        created_at: branch.created_at,
+                        updated_at: branch.updated_at
+                      });
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="input w-full sm:w-64 h-9">
+                  <SelectValue placeholder="Filial tanlash" />
+                </SelectTrigger>
+                <SelectContent className="card border-slate-700">
+                  <SelectItem value="all">Barcha filiallar</SelectItem>
+                  {branches.map((branch: any) => (
+                    <SelectItem key={branch.id || branch._id} value={branch.id || branch._id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedBranch && (
+                <span className="text-xs text-slate-500 hidden sm:inline">
+                  {selectedBranch.district}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        
         <div className="p-4 sm:p-6 pt-16 lg:pt-6 min-h-screen">
           <Outlet />
         </div>

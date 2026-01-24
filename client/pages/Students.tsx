@@ -9,15 +9,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "../hooks/useAuth";
+import { useDebounce } from "../hooks/useDebounce";
 import api from "@/lib/axios";
+import { StudentCardSkeletonGrid } from "@/components/StudentCardSkeleton";
+import EmptyState from "@/components/EmptyState";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function Students() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; student: any | null }>({ open: false, student: null });
   const [formData, setFormData] = useState({
     name: "", phone: "", role: "Student Offline", subscriptionPlan: "Pro",
     monthly_fee: 0, totalBall: 0, step: 0, joinDate: new Date().toISOString().split('T')[0],
@@ -112,13 +118,18 @@ export default function Students() {
   };
 
   const handleDelete = (student: any) => {
-    const studentId = student.id || student._id;
-    if (!studentId) return;
-    if (window.confirm("O'chirmoqchimisiz?")) deleteMutation.mutate(studentId);
+    setDeleteConfirm({ open: true, student });
+  };
+
+  const confirmDelete = () => {
+    const studentId = deleteConfirm.student?.id || deleteConfirm.student?._id;
+    if (studentId) {
+      deleteMutation.mutate(studentId);
+    }
   };
 
   const filteredStudents = (students as any[]).filter((s: any) => {
-    const matchesSearch = !searchQuery || s.name?.toLowerCase().includes(searchQuery.toLowerCase()) || s.phone?.includes(searchQuery);
+    const matchesSearch = !debouncedSearch || s.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) || s.phone?.includes(debouncedSearch);
     const sBranchId = typeof s.branch_id === 'object' ? s.branch_id?._id?.toString() : s.branch_id?.toString();
     const matchesBranch = !selectedBranchId || selectedBranchId === "all" || (selectedBranchId === "no-branch" && !s.branch_id) || sBranchId === selectedBranchId;
     return matchesSearch && matchesBranch;
@@ -191,8 +202,21 @@ export default function Students() {
         </Select>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredStudents.map((s: any, i: number) => {
+      {isLoading ? (
+        <StudentCardSkeletonGrid count={6} />
+      ) : filteredStudents.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title={students.length > 0 ? "Topilmadi" : "O'quvchilar yo'q"}
+          description={students.length > 0 ? "Qidiruv shartlariga mos o'quvchilar topilmadi" : "Birinchi o'quvchingizni qo'shing"}
+          action={students.length === 0 ? {
+            label: "Yangi O'quvchi",
+            onClick: () => { resetForm(); setIsDialogOpen(true); }
+          } : undefined}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredStudents.map((s: any, i: number) => {
           const sId = s.id || s._id;
           const bName = typeof s.branch_id === 'object' ? s.branch_id?.name : branches.find((b: any) => (b.id || b._id) === s.branch_id)?.name;
           return (
@@ -221,8 +245,22 @@ export default function Students() {
             </div>
           );
         })}
-      </div>
-      {filteredStudents.length === 0 && <div className="text-center py-12"><Users className="w-12 h-12 text-slate-600 mx-auto mb-3" /><p className="text-slate-400">{students.length > 0 ? "Topilmadi" : "O'quvchilar yo'q"}</p></div>}
+        </div>
+      )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) => setDeleteConfirm({ open, student: null })}
+        onConfirm={confirmDelete}
+        title="O'quvchini o'chirish"
+        description={`${deleteConfirm.student?.name} ni o'chirmoqchimisiz? Bu amalni qaytarib bo'lmaydi.`}
+        confirmText="O'chirish"
+        cancelText="Bekor qilish"
+        variant="danger"
+        icon="delete"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

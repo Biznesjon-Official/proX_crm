@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DollarSign, Search, Phone, CheckCircle, XCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useBranchContext } from "@/hooks/useBranchContext";
 import api from "@/lib/axios";
 
 interface Student {
@@ -21,6 +22,7 @@ export default function Payments() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedBranch } = useBranchContext();
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students-mongo"],
@@ -49,11 +51,21 @@ export default function Payments() {
     updatePaymentMutation.mutate({ studentId: student._id || student.id!, isPaid: !isPaid });
   };
 
-  const filteredStudents = students.filter((s: Student) => {
-    const isStudentOffline = s.role === 'Student Offline';
-    const matchesSearch = s.name?.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm);
-    return isStudentOffline && matchesSearch;
-  });
+  const filteredStudents = useMemo(() => {
+    return students.filter((s: Student) => {
+      const isStudentOffline = s.role === 'Student Offline';
+      const matchesSearch = s.name?.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone?.includes(searchTerm);
+      
+      // Branch filter
+      let matchesBranch = true;
+      if (selectedBranch) {
+        const sBranchId = typeof s.branch_id === 'object' ? (s.branch_id as any)?._id?.toString() : s.branch_id?.toString();
+        matchesBranch = sBranchId === selectedBranch.id;
+      }
+      
+      return isStudentOffline && matchesSearch && matchesBranch;
+    });
+  }, [students, searchTerm, selectedBranch]);
 
   const paidCount = filteredStudents.filter((s: Student) => s.current_month_payment === 'paid').length;
   const unpaidCount = filteredStudents.length - paidCount;

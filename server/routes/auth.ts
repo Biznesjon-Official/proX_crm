@@ -22,44 +22,26 @@ const users = [
         username: "gijduvan_manager",
         password: "gijduvan123",
         name: "G'ijduvon Filiali Rahbari",
-        role: "branch_manager" as const,
+        role: "manager" as const,
         branch_id: null, // MongoDB'dan dinamik ravishda topiladi
         created_at: new Date(),
     },
     {
-        id: "6", 
+        id: "3", 
         username: "vobkent_manager",
         password: "vobkent123",
         name: "Vobkent Filiali Rahbari",
-        role: "branch_manager" as const,
+        role: "manager" as const,
         branch_id: "branch_vobkent", // Faqat Vobkent filialini ko'radi
         created_at: new Date(),
     },
     {
-        id: "3",
+        id: "4",
         username: "tashkent_manager", 
         password: "tashkent123",
         name: "Toshkent Filiali Rahbari",
-        role: "branch_manager" as const,
+        role: "manager" as const,
         branch_id: "branch_tashkent", // Faqat Toshkent filialini ko'radi
-        created_at: new Date(),
-    },
-    {
-        id: "4",
-        username: "vobkent_teacher",
-        password: "teacher123",
-        name: "Vobkent Bosh O'qituvchi",
-        role: "head_teacher" as const, 
-        branch_id: "branch_vobkent", // Faqat Vobkent filialidagi o'quvchilar
-        created_at: new Date(),
-    },
-    {
-        id: "5",
-        username: "tashkent_teacher",
-        password: "teacher456", 
-        name: "Toshkent Bosh O'qituvchi",
-        role: "head_teacher" as const,
-        branch_id: "branch_tashkent", // Faqat Toshkent filialidagi o'quvchilar
         created_at: new Date(),
     }
 ];
@@ -328,9 +310,9 @@ export const requireSuperAdmin = (req: any, res: any, next: any) => {
     next();
 };
 
-// Branch manager yoki super admin huquqini tekshirish
-export const requireBranchManagerOrSuperAdmin = (req: any, res: any, next: any) => {
-    if (!['super_admin', 'branch_manager'].includes(req.user?.role)) {
+// Manager yoki super admin huquqini tekshirish
+export const requireManagerOrSuperAdmin = (req: any, res: any, next: any) => {
+    if (!['super_admin', 'manager'].includes(req.user?.role)) {
         return res.status(403).json({ message: "Ruxsat yo'q" });
     }
     next();
@@ -370,7 +352,7 @@ export const addBranchManager = (userData: {
     username: userData.username,
     password: userData.password,
     name: userData.name,
-    role: "branch_manager" as const,
+    role: "manager" as const,
     branch_id: userData.branch_id,
     created_at: new Date(),
   };

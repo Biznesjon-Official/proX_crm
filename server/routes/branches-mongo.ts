@@ -9,7 +9,7 @@ const router = Router();
 // Get all users (for admin assignment dropdown)
 router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
-    const users = await User.find({ role: { $in: ['branch_manager', 'head_teacher'] } })
+    const users = await User.find({ role: { $in: ['manager'] } })
       .select('username role branch_id')
       .populate('branch_id', 'name');
     

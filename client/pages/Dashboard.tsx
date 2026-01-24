@@ -2,13 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { Users, TrendingUp, Award, Target, Building2, Clock, RefreshCw } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useBranchContext } from "../hooks/useBranchContext";
 import api from "@/lib/axios";
 import React from "react";
+import PaymentSchedulerWidget from "@/components/PaymentSchedulerWidget";
+import DashboardStatsSkeleton from "@/components/DashboardStatsSkeleton";
 
-type UserRole = 'super_admin' | 'branch_manager' | 'head_teacher' | 'student';
+type UserRole = 'super_admin' | 'student';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { selectedBranch } = useBranchContext();
   
   if ((user?.role as UserRole) === 'student') {
     return <Navigate to="/student-profile" replace />;
@@ -31,17 +35,28 @@ export default function Dashboard() {
     queryFn: () => api.get('/branches-mongo').then(res => res.data)
   });
 
-  const totalStudents = students?.length || 0;
+  // Filter students by selected branch
+  const filteredStudents = React.useMemo(() => {
+    if (!students) return [];
+    if (!selectedBranch) return students;
+    
+    return students.filter((s: any) => {
+      const sBranchId = typeof s.branch_id === 'object' ? s.branch_id?._id?.toString() : s.branch_id?.toString();
+      return sBranchId === selectedBranch.id;
+    });
+  }, [students, selectedBranch]);
+
+  const totalStudents = filteredStudents?.length || 0;
   const avgPercentage = progressStats?.avg_percentage ? Math.round(progressStats.avg_percentage) : 0;
 
   const growthPercentage = React.useMemo(() => {
     if (progressStats?.growth_percentage !== undefined) return progressStats.growth_percentage;
-    if (!students || students.length === 0) return 0;
+    if (!filteredStudents || filteredStudents.length === 0) return 0;
     
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const recentStudents = students.filter((s: any) => {
+    const recentStudents = filteredStudents.filter((s: any) => {
       const dateStr = s.created_at || s.joinDate;
       if (!dateStr) return false;
       return new Date(dateStr) >= thirtyDaysAgo;
@@ -51,7 +66,7 @@ export default function Dashboard() {
     const oldCount = totalStudents - recentStudents.length;
     if (oldCount === 0) return 100;
     return Math.round((recentStudents.length / oldCount) * 100);
-  }, [students, totalStudents, progressStats?.growth_percentage]);
+  }, [filteredStudents, totalStudents, progressStats?.growth_percentage]);
 
   const getTimeAgo = (date: string | Date | undefined) => {
     if (!date) return "Hech qachon";
@@ -89,7 +104,9 @@ export default function Dashboard() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-          <p className="text-slate-500 text-sm">Tizim statistikasi</p>
+          <p className="text-slate-500 text-sm">
+            {selectedBranch ? `${selectedBranch.name} - Statistika` : 'Tizim statistikasi'}
+          </p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2">
           <RefreshCw className="w-4 h-4" />
@@ -99,54 +116,64 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="stat-card">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-slate-500 mb-1">{stat.label}</p>
-                {stat.loading ? (
-                  <div className="h-8 w-16 skeleton rounded" />
-                ) : (
+        {studentsLoading || statsLoading ? (
+          <DashboardStatsSkeleton />
+        ) : (
+          stats.map((stat) => (
+            <div key={stat.label} className="stat-card">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">{stat.label}</p>
                   <p className="text-2xl font-semibold text-white">{stat.value}</p>
-                )}
-                {stat.change && <p className="text-xs text-green-400 mt-1">{stat.change}</p>}
-                {stat.sub && <p className="text-xs text-slate-500 mt-1">{stat.sub}</p>}
-              </div>
-              <div className={`p-2 rounded-lg ${colors[stat.color]}`}>
-                <stat.icon className="w-5 h-5" />
+                  {stat.change && <p className="text-xs text-green-400 mt-1">{stat.change}</p>}
+                  {stat.sub && <p className="text-xs text-slate-500 mt-1">{stat.sub}</p>}
+                </div>
+                <div className={`p-2 rounded-lg ${colors[stat.color]}`}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      {/* Branches */}
-      <div className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Building2 className="w-5 h-5 text-cyan-400" />
-          <h3 className="font-medium text-white">Filiallar Faolligi</h3>
-        </div>
-        <div className="space-y-2 max-h-80 overflow-y-auto">
-          {sortedBranches.length > 0 ? sortedBranches.map((branch: any, i: number) => {
-            const isOnline = branch.last_login && (Date.now() - new Date(branch.last_login).getTime()) < 1800000;
-            return (
-              <div key={branch._id || i} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-slate-600'}`} />
-                  <div>
-                    <p className="text-sm text-white">{branch.name}</p>
-                    <p className="text-xs text-slate-500">{branch.district}</p>
+      {/* Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Branches - 2 columns */}
+        <div className="lg:col-span-2">
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Building2 className="w-5 h-5 text-cyan-400" />
+              <h3 className="font-medium text-white">Filiallar Faolligi</h3>
+            </div>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {sortedBranches.length > 0 ? sortedBranches.map((branch: any, i: number) => {
+                const isOnline = branch.last_login && (Date.now() - new Date(branch.last_login).getTime()) < 1800000;
+                return (
+                  <div key={branch._id || i} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg hover:bg-slate-800 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-slate-600'}`} />
+                      <div>
+                        <p className="text-sm text-white">{branch.name}</p>
+                        <p className="text-xs text-slate-500">{branch.district}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <Clock className="w-3 h-3" />
+                      <span className={isOnline ? 'text-green-400' : ''}>{getTimeAgo(branch.last_login)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <Clock className="w-3 h-3" />
-                  <span className={isOnline ? 'text-green-400' : ''}>{getTimeAgo(branch.last_login)}</span>
-                </div>
-              </div>
-            );
-          }) : (
-            <p className="text-center text-slate-500 py-8">Filiallar topilmadi</p>
-          )}
+                );
+              }) : (
+                <p className="text-center text-slate-500 py-8">Filiallar topilmadi</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Scheduler - 1 column */}
+        <div className="lg:col-span-1">
+          <PaymentSchedulerWidget />
         </div>
       </div>
     </div>

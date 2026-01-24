@@ -66,7 +66,7 @@ export interface User {
   id: string;
   username: string;
   name: string;
-  role: 'super_admin' | 'branch_manager' | 'head_teacher' | 'student' | 'mentor' | 'manager';
+  role: 'super_admin' | 'student' | 'mentor' | 'manager';
   branch_id: string | null; // null bo'lsa super_admin
   created_at: Date;
 }

@@ -27,8 +27,8 @@ router.get('/', authenticateToken, async (req: any, res) => {
     // Query yaratish - faqat studentprogresses collection'dan
     let query: any = {};
 
-    // Branch manager uchun - avval studentIds ni olish (lekin bu bitta query)
-    if (req.user.role === 'branch_manager') {
+    // Manager uchun - avval studentIds ni olish (lekin bu bitta query)
+    if (req.user.role === 'manager') {
       // Faqat bitta collection'dan - Student collection'dan studentIds olish
       const studentIds = await Student.find({ branch_id: req.user.branch_id })
         .select('_id')
@@ -111,13 +111,16 @@ router.post('/', authenticateToken, async (req: any, res) => {
       return res.status(403).json({ error: 'Bu o\'quvchiga ball berishga ruxsat yo\'q' });
     }
 
-    // Progress yaratish
+    // Progress yaratish with mentor info
     const progress = new StudentProgress({
       studentId: student_id, // studentId maydonini to'g'ri ishlatish
       score,
       completedAt: date,
       stepNumber: step,
-      stepTitle: note
+      stepTitle: note,
+      mentorUsername: req.user.username, // Mentor username
+      mentorName: req.user.name || req.user.username, // Mentor name
+      mentorId: req.user.id // Mentor ID
     });
 
     await progress.save();
@@ -189,8 +192,8 @@ router.get('/students', authenticateToken, async (req: any, res) => {
 
     let query: any = {};
 
-    // Branch manager faqat o'z filialidagi o'quvchilarni ko'radi
-    if (req.user.role === 'branch_manager') {
+    // Manager faqat o'z filialidagi o'quvchilarni ko'radi
+    if (req.user.role === 'manager') {
       query.branch_id = req.user.branch_id;
     } else if (req.query.branch_id) {
       query.branch_id = req.query.branch_id;

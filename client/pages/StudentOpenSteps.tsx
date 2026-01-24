@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users, TrendingUp, Award, Search, RefreshCw, TrendingDown } from "lucide-react";
+import { useBranchContext } from "@/hooks/useBranchContext";
 import api from "@/lib/axios";
 
 interface StudentStep {
@@ -11,12 +12,14 @@ interface StudentStep {
   step: number;         // CRM dan (mentor)
   totalBall: number;
   progress: number;
+  branch_id?: string;   // Branch ID
 }
 
 export default function StudentOpenSteps() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"currentStep" | "progress">("currentStep");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const { selectedBranch } = useBranchContext();
 
   const { data: students = [], isLoading, refetch } = useQuery<StudentStep[]>({
     queryKey: ["students-with-steps"],
@@ -27,12 +30,22 @@ export default function StudentOpenSteps() {
 
   // Memoized filter va sort - qayta render bo'lganda qayta hisoblanmaydi
   const sortedStudents = useMemo(() => {
-    const filtered = students.filter(
+    let filtered = students.filter(
       (student) =>
         student.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.login.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
+    
+    // Branch filter
+    if (selectedBranch) {
+      filtered = filtered.filter((student) => {
+        const sBranchId = typeof student.branch_id === 'object' 
+          ? (student.branch_id as any)?._id?.toString() 
+          : student.branch_id?.toString();
+        return sBranchId === selectedBranch.id;
+      });
+    }
+    
     return filtered.sort((a, b) => {
       let comparison = 0;
       if (sortBy === "currentStep") {
@@ -42,24 +55,24 @@ export default function StudentOpenSteps() {
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [students, searchQuery, sortBy, sortOrder]);
+  }, [students, searchQuery, sortBy, sortOrder, selectedBranch]);
 
-  // Memoized stats
+  // Memoized stats - filtered students uchun
   const stats = useMemo(() => ({
-    total: students.length,
+    total: sortedStudents.length,
     avgCurrentStep:
-      students.length > 0
-        ? Math.round(students.reduce((sum, s) => sum + s.currentStep, 0) / students.length)
+      sortedStudents.length > 0
+        ? Math.round(sortedStudents.reduce((sum, s) => sum + s.currentStep, 0) / sortedStudents.length)
         : 0,
     avgStep:
-      students.length > 0
-        ? Math.round(students.reduce((sum, s) => sum + s.step, 0) / students.length)
+      sortedStudents.length > 0
+        ? Math.round(sortedStudents.reduce((sum, s) => sum + s.step, 0) / sortedStudents.length)
         : 0,
     avgProgress:
-      students.length > 0
-        ? Math.round(students.reduce((sum, s) => sum + s.progress, 0) / students.length)
+      sortedStudents.length > 0
+        ? Math.round(sortedStudents.reduce((sum, s) => sum + s.progress, 0) / sortedStudents.length)
         : 0,
-  }), [students]);
+  }), [sortedStudents]);
 
   const handleSort = (field: "currentStep" | "progress") => {
     if (sortBy === field) {

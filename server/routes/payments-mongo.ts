@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Student, Payment } from '../mongodb.js';
-import { authenticateToken, requireBranchManagerOrSuperAdmin } from './auth.js';
+import { authenticateToken, requireManagerOrSuperAdmin } from './auth.js';
 import mongoose from 'mongoose';
 
 const router = Router();
@@ -104,7 +104,7 @@ router.get('/upcoming', authenticateToken, async (req: any, res) => {
 });
 
 // Create payment record
-router.post('/', authenticateToken, requireBranchManagerOrSuperAdmin, async (req: any, res) => {
+router.post('/', authenticateToken, requireManagerOrSuperAdmin, async (req: any, res) => {
   try {
     const { student_id, amount, expected_amount, payment_date, status, note } = req.body;
 
@@ -159,7 +159,7 @@ router.post('/', authenticateToken, requireBranchManagerOrSuperAdmin, async (req
 });
 
 // Update payment
-router.put('/:id', authenticateToken, requireBranchManagerOrSuperAdmin, async (req: any, res) => {
+router.put('/:id', authenticateToken, requireManagerOrSuperAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
     const { amount, expected_amount, status, note } = req.body;
@@ -198,7 +198,7 @@ router.put('/:id', authenticateToken, requireBranchManagerOrSuperAdmin, async (r
 });
 
 // Delete payment
-router.delete('/:id', authenticateToken, requireBranchManagerOrSuperAdmin, async (req: any, res) => {
+router.delete('/:id', authenticateToken, requireManagerOrSuperAdmin, async (req: any, res) => {
   try {
     const { id } = req.params;
 

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Phone, Calendar, Award, Target, TrendingUp, Clock, CheckCircle, Lock } from "lucide-react";
 import { getAuthToken } from "../utils/auth";
 import api from "@/lib/axios";
+import ProgressHistory from "@/components/ProgressHistory";
 
 export default function StudentDetail() {
   const { id } = useParams();
@@ -215,6 +216,14 @@ export default function StudentDetail() {
           <p className="text-lg font-bold text-white">{(getWeeklySteps() / 7).toFixed(1)} qadam</p>
         </div>
       </div>
+
+      {/* Progress History */}
+      {!isBlocked && (
+        <ProgressHistory 
+          studentId={id!} 
+          studentName={student.student_name} 
+        />
+      )}
     </div>
   );
 }

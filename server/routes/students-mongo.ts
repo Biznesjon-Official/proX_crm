@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Student, Branch } from '../mongodb.js';
-import { authenticateToken, requireBranchManagerOrSuperAdmin } from './auth.js';
+import { authenticateToken, requireManagerOrSuperAdmin } from './auth.js';
 import mongoose from 'mongoose';
 
 const router = Router();

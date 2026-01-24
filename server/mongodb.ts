@@ -126,7 +126,7 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   plainPassword: String, // Parolni ochiq ko'rinishda saqlash
-  role: { type: String, enum: ['super_admin', 'branch_manager', 'mentor', 'manager'], default: 'manager' },
+  role: { type: String, enum: ['super_admin', 'mentor', 'manager'], default: 'manager' },
   branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
@@ -159,19 +159,23 @@ const studentProgressSchema = new mongoose.Schema({
   percentage: { type: Number }, // Foiz
   completed: { type: Boolean }, // Bajarilganmi
   completedAt: { type: Date }, // Bajarilgan vaqt
-  createdAt: { type: Date }, // Yaratilgan vaqt
+  createdAt: { type: Date, default: Date.now }, // Yaratilgan vaqt
   updatedAt: { type: Date }, // Yangilangan vaqt
   totalQuestions: { type: Number }, // Jami savollar
   correctCount: { type: Number }, // To'g'ri javoblar
   answers: [mongoose.Schema.Types.Mixed], // Javoblar
   sectionNumber: { type: Number }, // Bo'lim raqami
-  stars: { type: Number } // Yulduzlar
+  stars: { type: Number }, // Yulduzlar
+  // Mentor ma'lumotlari (kim ball berdi)
+  mentorId: { type: String }, // Mentor ID
+  mentorUsername: { type: String }, // Mentor username
+  mentorName: { type: String } // Mentor ismi
 }, { 
   collection: 'studentprogresses', // Ko'plik shakli
   strict: false // MongoDB'dagi qo'shimcha maydonlarni ham qabul qilish
 });
 
-studentProgressSchema.index({ student_id: 1, date: -1 }); // Tez qidiruv uchun
+studentProgressSchema.index({ studentId: 1, completedAt: -1 }); // Tez qidiruv uchun
 
 export const StudentProgress = mongoose.models.StudentProgress || mongoose.model('StudentProgress', studentProgressSchema);
 
