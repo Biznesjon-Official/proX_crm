@@ -8,14 +8,20 @@ import React from "react";
 import PaymentSchedulerWidget from "@/components/PaymentSchedulerWidget";
 import DashboardStatsSkeleton from "@/components/DashboardStatsSkeleton";
 
-type UserRole = 'super_admin' | 'student';
+type UserRole = 'super_admin' | 'student' | 'mentor' | 'manager';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { selectedBranch } = useBranchContext();
   
-  if ((user?.role as UserRole) === 'student') {
+  // Student uchun profile'ga yo'naltirish
+  if (user?.role === 'student') {
     return <Navigate to="/student-profile" replace />;
+  }
+  
+  // Mentor uchun student-progress'ga yo'naltirish
+  if (user?.role === 'mentor') {
+    return <Navigate to="/student-progress" replace />;
   }
   
   const { data: students, isLoading: studentsLoading, refetch } = useQuery({
