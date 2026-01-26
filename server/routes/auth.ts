@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { LoginRequest, LoginResponse } from "../../shared/types";
 import { User, Session, Student, Branch } from '../mongodb.js';
 import bcrypt from 'bcryptjs';
@@ -6,8 +7,28 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
+// Rate limiting for login endpoint (Brute force protection)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minut
+  max: 5, // 5 ta urinish
+  message: { message: "Juda ko'p urinish. 15 daqiqadan keyin qayta urinib ko'ring." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true // Muvaffaqiyatli login'lar hisoblanmaydi
+});
+
 // Demo users with role-based access
-const users = [
+type DemoUser = {
+    id: string;
+    username: string;
+    password: string;
+    name: string;
+    role: "super_admin" | "manager";
+    branch_id: string | null;
+    created_at: Date;
+};
+
+const users: DemoUser[] = [
     {
         id: "1",
         username: "superadmin",
@@ -32,7 +53,7 @@ const users = [
         password: "vobkent123",
         name: "Vobkent Filiali Rahbari",
         role: "manager" as const,
-        branch_id: "branch_vobkent", // Faqat Vobkent filialini ko'radi
+        branch_id: null, // MongoDB'dan dinamik ravishda topiladi
         created_at: new Date(),
     },
     {
@@ -41,13 +62,13 @@ const users = [
         password: "tashkent123",
         name: "Toshkent Filiali Rahbari",
         role: "manager" as const,
-        branch_id: "branch_tashkent", // Faqat Toshkent filialini ko'radi
+        branch_id: null, // MongoDB'dan dinamik ravishda topiladi
         created_at: new Date(),
     }
 ];
 
-// Login endpoint
-router.post("/login", async (req, res) => {
+// Login endpoint with rate limiting
+router.post("/login", loginLimiter, async (req, res) => {
     try {
         const { username, password }: LoginRequest = req.body;
 
@@ -61,31 +82,35 @@ router.post("/login", async (req, res) => {
         if (hardcodedUser) {
             const token = `token_${hardcodedUser.id}_${Date.now()}`;
             
-            // G'ijduvon manager uchun branch_id ni MongoDB'dan topish
+            // Branch ID ni MongoDB'dan dinamik topish
             let actualBranchId = hardcodedUser.branch_id;
-            if (hardcodedUser.username === 'gijduvan_manager') {
+            
+            // Manager'lar uchun branch_id ni topish
+            if (hardcodedUser.role === 'manager' && !actualBranchId) {
                 try {
-                    const gijduvonBranch = await Branch.findOne({ 
-                        name: { $regex: /g.ijduvan/i } 
-                    });
-                    if (gijduvonBranch) {
-                        actualBranchId = gijduvonBranch._id.toString();
-                        // Last login yangilash
-                        await Branch.findByIdAndUpdate(gijduvonBranch._id, {
-                            last_login: new Date()
+                    let branchName = '';
+                    if (hardcodedUser.username === 'gijduvan_manager') {
+                        branchName = 'g.ijduvan';
+                    } else if (hardcodedUser.username === 'vobkent_manager') {
+                        branchName = 'vobkent';
+                    } else if (hardcodedUser.username === 'tashkent_manager') {
+                        branchName = 'tashkent';
+                    }
+                    
+                    if (branchName) {
+                        const branch = await Branch.findOne({ 
+                            name: { $regex: new RegExp(branchName, 'i') } 
                         });
+                        if (branch) {
+                            actualBranchId = branch._id.toString();
+                            // Last login yangilash
+                            await Branch.findByIdAndUpdate(branch._id, {
+                                last_login: new Date()
+                            });
+                        }
                     }
                 } catch (e) {
-                    console.log('G\'ijduvon filialini topishda xatolik:', e);
-                }
-            } else if (hardcodedUser.branch_id) {
-                // Boshqa hardcoded userlar uchun
-                try {
-                    await Branch.findByIdAndUpdate(hardcodedUser.branch_id, {
-                        last_login: new Date()
-                    });
-                } catch (e) {
-                    console.log('Branch last_login yangilashda xatolik:', e);
+                    console.log('Branch topishda xatolik:', e);
                 }
             }
             
@@ -225,18 +250,29 @@ export const authenticateToken = async (req: any, res: any, next: any) => {
             if (user) {
                 const { password: _, ...userWithoutPassword } = user;
                 
-                // G'ijduvon manager uchun branch_id ni MongoDB'dan topish
+                // Manager'lar uchun branch_id ni MongoDB'dan topish
                 let actualBranchId = user.branch_id;
-                if (user.username === 'gijduvan_manager') {
+                if (user.role === 'manager' && !actualBranchId) {
                     try {
-                        const gijduvonBranch = await Branch.findOne({ 
-                            name: { $regex: /g.ijduvan/i } 
-                        });
-                        if (gijduvonBranch) {
-                            actualBranchId = gijduvonBranch._id.toString();
+                        let branchName = '';
+                        if (user.username === 'gijduvan_manager') {
+                            branchName = 'g.ijduvan';
+                        } else if (user.username === 'vobkent_manager') {
+                            branchName = 'vobkent';
+                        } else if (user.username === 'tashkent_manager') {
+                            branchName = 'tashkent';
+                        }
+                        
+                        if (branchName) {
+                            const branch = await Branch.findOne({ 
+                                name: { $regex: new RegExp(branchName, 'i') } 
+                            });
+                            if (branch) {
+                                actualBranchId = branch._id.toString();
+                            }
                         }
                     } catch (e) {
-                        console.log('G\'ijduvon filialini topishda xatolik:', e);
+                        console.log('Branch topishda xatolik:', e);
                     }
                 }
                 
@@ -340,7 +376,7 @@ export const addBranchManager = (userData: {
   username: string;
   password: string;
   name: string;
-  branch_id: string;
+  branch_id: string | null;
 }) => {
   // Username unique ekanligini tekshirish
   if (!isUsernameUnique(userData.username)) {

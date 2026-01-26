@@ -105,14 +105,12 @@ router.post('/', authenticateToken, requireSuperAdmin, async (req, res) => {
       address,
       phone,
       branch_type: branch_type || 'manager',
-      // Mentor ma'lumotlari
+      // Mentor ma'lumotlari (faqat username, parol hash'da)
       mentor_name: mentor_name || '',
       mentor_username: mentor_username || '',
-      mentor_password: mentor_password || '',
-      // Manager ma'lumotlari
+      // Manager ma'lumotlari (faqat username, parol hash'da)
       manager_user_name: manager_name || '',
-      manager_username: manager_username || '',
-      manager_user_password: manager_password || ''
+      manager_username: manager_username || ''
     });
 
     await branch.save();
@@ -125,7 +123,6 @@ router.post('/', authenticateToken, requireSuperAdmin, async (req, res) => {
         const mentorUser = new User({
           username: mentor_username,
           password: hashedPassword,
-          plainPassword: mentor_password,
           role: 'mentor',
           branch_id: branch._id
         });
@@ -141,7 +138,6 @@ router.post('/', authenticateToken, requireSuperAdmin, async (req, res) => {
         const managerUser = new User({
           username: manager_username,
           password: hashedPassword,
-          plainPassword: manager_password,
           role: 'manager',
           branch_id: branch._id
         });
@@ -175,15 +171,13 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     
     if (branch_type) updateData.branch_type = branch_type;
 
-    // Mentor ma'lumotlarini yangilash
+    // Mentor ma'lumotlarini yangilash (faqat username)
     if (mentor_name !== undefined) updateData.mentor_name = mentor_name;
     if (mentor_username !== undefined) updateData.mentor_username = mentor_username;
-    if (mentor_password !== undefined) updateData.mentor_password = mentor_password;
 
-    // Manager ma'lumotlarini yangilash
+    // Manager ma'lumotlarini yangilash (faqat username)
     if (manager_name !== undefined) updateData.manager_user_name = manager_name;
     if (manager_username !== undefined) updateData.manager_username = manager_username;
-    if (manager_password !== undefined) updateData.manager_user_password = manager_password;
 
     const branch = await Branch.findByIdAndUpdate(
       req.params.id,
@@ -201,7 +195,6 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
       if (mentorUser) {
         mentorUser.username = mentor_username;
         mentorUser.password = await bcrypt.hash(mentor_password, 10);
-        mentorUser.plainPassword = mentor_password;
         await mentorUser.save();
       } else {
         const existingUser = await User.findOne({ username: mentor_username });
@@ -210,7 +203,6 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
           const newMentor = new User({
             username: mentor_username,
             password: hashedPassword,
-            plainPassword: mentor_password,
             role: 'mentor',
             branch_id: branch._id
           });
@@ -225,7 +217,6 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
       if (managerUser) {
         managerUser.username = manager_username;
         managerUser.password = await bcrypt.hash(manager_password, 10);
-        managerUser.plainPassword = manager_password;
         await managerUser.save();
       } else {
         const existingUser = await User.findOne({ username: manager_username });
@@ -234,7 +225,6 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
           const newManager = new User({
             username: manager_username,
             password: hashedPassword,
-            plainPassword: manager_password,
             role: 'manager',
             branch_id: branch._id
           });

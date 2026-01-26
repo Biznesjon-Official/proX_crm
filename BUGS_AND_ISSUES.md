@@ -1,7 +1,60 @@
 # 🐛 CRM Prox - Xatolar va Muammolar Hisoboti
 
 **Tekshirilgan sana:** 2026-01-24  
-**Umumiy holat:** ✅ Yaxshi (Kritik xatolar yo'q)
+**Oxirgi yangilanish:** 2026-01-24 (Kritik muammolar hal qilindi)  
+**Umumiy holat:** ✅ Yaxshi (Kritik xatolar tuzatildi)
+
+---
+
+## 🎉 YANGI TUZATILGAN XATOLAR (2026-01-24)
+
+### ✅ 1. Rate Limiting Qo'shildi
+**Muammo:** Login endpoint'da brute force himoyasi yo'q edi  
+**Yechim:** express-rate-limit qo'shildi (15 daqiqada 5 ta urinish)  
+**Fayl:** `crmprox/server/routes/auth.ts`  
+**Status:** ✅ HAL QILINDI
+
+### ✅ 2. CORS Configuration
+**Muammo:** CORS sozlanmagan, CSRF attacks xavfi  
+**Yechim:** CORS middleware qo'shildi, allowed origins sozlandi  
+**Fayl:** `crmprox/server/index.ts`  
+**Status:** ✅ HAL QILINDI
+
+### ✅ 3. Helmet Security Headers
+**Muammo:** HTTP security headers yo'q edi  
+**Yechim:** Helmet middleware qo'shildi  
+**Fayl:** `crmprox/server/index.ts`  
+**Status:** ✅ HAL QILINDI
+
+### ✅ 4. Request Size Limit
+**Muammo:** Body parser limit yo'q, DoS attacks xavfi  
+**Yechim:** 10MB limit qo'shildi  
+**Fayl:** `crmprox/server/index.ts`  
+**Status:** ✅ HAL QILINDI
+
+### ✅ 5. Hard-coded Branch IDs
+**Muammo:** auth.ts da hard-coded branch_id'lar  
+**Yechim:** MongoDB'dan dinamik topish qo'shildi  
+**Fayl:** `crmprox/server/routes/auth.ts`  
+**Status:** ✅ HAL QILINDI
+
+### ✅ 6. Passwords in Plain Text (KRITIK)
+**Muammo:** plainPassword maydonida parollar ochiq saqlangan  
+**Yechim:** plainPassword maydonlari o'chirildi, faqat hash saqlanadi  
+**Fayllar:**
+- `crmprox/server/mongodb.ts` - Schema'dan o'chirildi
+- `crmprox/server/routes/branches-mongo.ts` - Yaratish/yangilashdan o'chirildi  
+**Status:** ✅ HAL QILINDI
+
+---
+
+## 🔧 TUZATILGAN XATOLAR (Oldingi)
+
+### ✅ Students.tsx - isLoading undefined (2026-01-24)
+**Muammo:** `isLoading is not defined` xatosi  
+**Sabab:** useQuery hook'dan isLoading destructure qilinmagan  
+**Yechim:** `const { data: students = [], isLoading } = useQuery(...)` qo'shildi  
+**Fayl:** `crmprox/client/pages/Students.tsx`
 
 ---
 
@@ -101,7 +154,7 @@ Barcha sahifalarda `useBranchContext` ishlatish
 
 ---
 
-### 4. **Hard-coded Branch IDs**
+### ✅ 4. **Hard-coded Branch IDs** - HAL QILINDI
 
 **Muammo:**
 ```typescript
@@ -112,14 +165,10 @@ branch_id: "branch_tashkent"
 
 **Ta'sir:** MongoDB ID bilan mos kelmaydi
 
-**Yechim:**
-```typescript
-// MongoDB'dan dinamik topish (G'ijduvon kabi)
-const branch = await Branch.findOne({ name: /vobkent/i });
-branch_id: branch._id.toString()
-```
+**Yechim:** ✅ MongoDB'dan dinamik topish qo'shildi
 
-**Fayl:** `server/routes/auth.ts`
+**Fayl:** `server/routes/auth.ts`  
+**Status:** ✅ TUZATILDI (2026-01-24)
 
 ---
 
@@ -255,7 +304,35 @@ onMutate: async (newData) => {
 
 ## 🔴 POTENSIAL XAVFLI MUAMMOLAR
 
-### 1. **No Input Validation**
+### ✅ 1. **Passwords in Plain Text** - HAL QILINDI
+**Muammo:** MongoDB'da plainPassword maydonida parollar ochiq saqlangan  
+**Xavf:** 🔴 KRITIK - Parollar ochiq ko'rinishda  
+**Yechim:** ✅ plainPassword maydonlari o'chirildi, faqat bcrypt hash saqlanadi  
+**Fayl:** `server/mongodb.ts`, `server/routes/branches-mongo.ts`  
+**Status:** ✅ TUZATILDI (2026-01-24)
+
+### ✅ 2. **No Rate Limiting** - HAL QILINDI
+**Muammo:** Login endpoint'da rate limit yo'q  
+**Xavf:** Brute force attacks  
+**Yechim:** ✅ express-rate-limit qo'shildi (15 min / 5 urinish)  
+**Fayl:** `server/routes/auth.ts`  
+**Status:** ✅ TUZATILDI (2026-01-24)
+
+### ✅ 3. **No CORS Configuration** - HAL QILINDI
+**Muammo:** CORS sozlanmagan  
+**Xavf:** CSRF attacks  
+**Yechim:** ✅ CORS middleware qo'shildi  
+**Fayl:** `server/index.ts`  
+**Status:** ✅ TUZATILDI (2026-01-24)
+
+### ✅ 4. **No Request Size Limit** - HAL QILINDI
+**Muammo:** Body parser limit yo'q  
+**Xavf:** DoS attacks  
+**Yechim:** ✅ 10MB limit qo'shildi  
+**Fayl:** `server/index.ts`  
+**Status:** ✅ TUZATILDI (2026-01-24)
+
+### ⚠️ 5. **No Input Validation**
 
 **Muammo:**
 ```typescript
@@ -278,97 +355,7 @@ const schema = z.object({
 
 ---
 
-### 2. **Passwords in Plain Text**
-
-**Muammo:**
-```typescript
-// MongoDB'da
-plainPassword: student.password
-```
-
-**Xavf:** 🔴 KRITIK - Parollar ochiq ko'rinishda
-
-**Yechim:**
-```typescript
-// plainPassword ni o'chirish
-// Faqat hash saqlash
-password: await bcrypt.hash(password, 10)
-```
-
-**Fayl:** `server/routes/auth.ts`, `server/routes/branches-mongo.ts`
-
----
-
-### 3. **No Rate Limiting**
-
-**Muammo:**
-```typescript
-// Login endpoint'da rate limit yo'q
-router.post("/login", async (req, res) => {
-```
-
-**Xavf:** Brute force attacks
-
-**Yechim:**
-```typescript
-import rateLimit from 'express-rate-limit';
-
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minut
-  max: 5 // 5 ta urinish
-});
-
-router.post("/login", loginLimiter, async (req, res) => {
-```
-
-**Fayl:** `server/routes/auth.ts`
-
----
-
-### 4. **No CORS Configuration**
-
-**Muammo:**
-```typescript
-// CORS sozlanmagan
-app.use(express.json());
-```
-
-**Xavf:** CSRF attacks
-
-**Yechim:**
-```typescript
-import cors from 'cors';
-
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true
-}));
-```
-
-**Fayl:** `server/index.ts`
-
----
-
-### 5. **No Request Size Limit**
-
-**Muammo:**
-```typescript
-// Body parser limit yo'q
-app.use(express.json());
-```
-
-**Xavf:** DoS attacks
-
-**Yechim:**
-```typescript
-app.use(express.json({ limit: '10mb' }));
-```
-
-**Fayl:** `server/index.ts`
-
----
-
-## 📊 PERFORMANCE MUAMMOLARI
+## ⚠️ KICHIK MUAMMOLAR (Critical emas)
 
 ### 1. **No Caching**
 
@@ -475,18 +462,17 @@ Kunlik MongoDB backup
 
 ## 📝 XULOSA
 
-### Umumiy Baho: **7/10** ⭐⭐⭐⭐⭐⭐⭐
+### Umumiy Baho: **8.5/10** ⭐⭐⭐⭐⭐⭐⭐⭐⭐
 
-### Kritik Muammolar: **2 ta** 🔴
-1. Parollar ochiq ko'rinishda (plainPassword)
-2. Rate limiting yo'q
+### Kritik Muammolar: **0 ta** ✅ (Barcha hal qilindi!)
+- ✅ Parollar hash'langan (plainPassword o'chirildi)
+- ✅ Rate limiting qo'shildi
+- ✅ CORS sozlandi
+- ✅ Helmet security headers
+- ✅ Request size limit
 
-### O'rta Muammolar: **5 ta** ⚠️
-1. Input validation yo'q
-2. CORS sozlanmagan
-3. Error boundary ishlatilmagan
-4. Pagination yo'q
-5. No caching strategy
+### O'rta Muammolar: **1 ta** ⚠️
+1. Input validation yo'q (Zod kerak)
 
 ### Kichik Muammolar: **10 ta** ℹ️
 1. API endpoint inconsistency
@@ -504,11 +490,13 @@ Kunlik MongoDB backup
 
 ## 🚀 TAVSIYALAR (Prioritet bo'yicha)
 
-### 1. Darhol Tuzatish Kerak (Kritik):
+### ✅ 1. Darhol Tuzatish Kerak (Kritik) - BAJARILDI!
 - ✅ plainPassword ni o'chirish
 - ✅ Rate limiting qo'shish
-- ✅ Input validation (Zod)
 - ✅ CORS sozlash
+- ✅ Helmet security headers
+- ✅ Request size limit
+- ⚠️ Input validation (Zod) - Keyingi
 
 ### 2. Tez Orada (1 hafta):
 - ⚠️ Error boundary

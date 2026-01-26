@@ -60,11 +60,9 @@ const branchSchema = new mongoose.Schema({
   // Mentor (o'qituvchi) ma'lumotlari
   mentor_name: String,
   mentor_username: String,
-  mentor_password: String, // Ochiq holda saqlash
   // Manager ma'lumotlari
   manager_user_name: String,
   manager_username: String,
-  manager_user_password: String, // Ochiq holda saqlash
   student_count: { type: Number, default: 0 },
   last_login: { type: Date }, // Oxirgi kirish vaqti
   created_at: { type: Date, default: Date.now },
@@ -96,8 +94,7 @@ const studentSchema = new mongoose.Schema({
   study_days: [String],
   payment_date: Date,
   username: { type: String, sparse: true }, // O'quvchi login (ixtiyoriy, unique emas)
-  password: String, // O'quvchi paroli (ixtiyoriy)
-  plainPassword: String, // Parolni ochiq ko'rinishda saqlash
+  password: String, // O'quvchi paroli (hash'langan)
   warnings: [{
     reason: String,
     date: { type: Date, default: Date.now },
@@ -124,8 +121,7 @@ export const Student = mongoose.models.Student || mongoose.model('Student', stud
 // User Schema (for authentication)
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  plainPassword: String, // Parolni ochiq ko'rinishda saqlash
+  password: { type: String, required: true }, // Hash'langan parol
   role: { type: String, enum: ['super_admin', 'mentor', 'manager'], default: 'manager' },
   branch_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
   created_at: { type: Date, default: Date.now },

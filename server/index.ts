@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cors from 'cors';
+import helmet from 'helmet';
 import { connectMongoDB } from './mongodb.js';
 import branchesMongoRouter from './routes/branches-mongo.js';
 import studentsMongoRouter from './routes/students-mongo.js';
@@ -9,6 +11,7 @@ import progressMongoRouter from './routes/progress-mongo.js';
 import paymentsMongoRouter from './routes/payments-mongo.js';
 import authRouter from './routes/auth.js';
 // import backupRouter from './routes/backup.js'; // TODO: Fix export issue
+import examResultsRouter from './routes/exam-results.js';
 import { startPaymentScheduler } from './utils/paymentScheduler.js';
 import { scheduleBackups } from './utils/backup.js';
 import mongoose from 'mongoose';
@@ -19,8 +22,36 @@ const __dirname = path.dirname(__filename);
 export async function createServer() {
   const app = express();
 
-  // Middleware
-  app.use(express.json());
+  // Security Middleware
+  app.use(helmet({
+    contentSecurityPolicy: false, // Vite dev server uchun
+    crossOriginEmbedderPolicy: false
+  }));
+
+  // CORS Configuration
+  const allowedOrigins = process.env.FRONTEND_URL 
+    ? [process.env.FRONTEND_URL] 
+    : ['http://localhost:5173', 'http://localhost:3000'];
+  
+  app.use(cors({
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS policy: Origin not allowed'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+
+  // Body Parser with size limit (DoS protection)
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Static files - faqat production uchun
   const isProduction = process.env.NODE_ENV === 'production';
@@ -43,7 +74,7 @@ export async function createServer() {
   scheduleBackups();
 
   // MongoDB ulanishini tekshirish va qayta ulanish middleware
-  app.use(async (req, res, next) => {
+  app.use(async (req, _res, next) => {
     // Auth endpoint'lari uchun MongoDB shart emas
     if (req.path.startsWith('/api/auth')) {
       return next();
@@ -71,6 +102,7 @@ export async function createServer() {
   app.use('/api/progress', progressMongoRouter); // MongoDB progress
   app.use('/api/progress-mongo', progressMongoRouter); // Backward compatibility
   app.use('/api/payments', paymentsMongoRouter); // MongoDB payments
+  app.use('/api/exam-results', examResultsRouter); // Exam results
   // app.use('/api/backup', backupRouter); // Backup system - TODO: Fix export issue
 
   // Health check

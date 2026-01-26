@@ -48,7 +48,7 @@ export default function Students() {
     queryFn: () => api.get('/branches-mongo').then(res => res.data as any[])
   });
 
-  const { data: students = [] } = useQuery({
+  const { data: students = [], isLoading } = useQuery({
     queryKey: ['students-mongo'],
     queryFn: () => api.get('/students-mongo').then(res => res.data as any[])
   });

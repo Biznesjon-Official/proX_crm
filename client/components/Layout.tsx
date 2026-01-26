@@ -1,4 +1,4 @@
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { Building2, Users, BarChart3, TrendingUp, DollarSign, Menu, X, LogOut, User, CheckCircle, Database, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
@@ -49,11 +49,6 @@ export default function Layout() {
     navigate("/login");
   };
 
-  const handleMenuClick = (path: string) => {
-    navigate(path);
-    setIsMobileMenuOpen(false);
-  };
-
   return (
     <div className="flex h-screen w-full bg-slate-950 overflow-hidden">
       {/* Mobile Menu Button */}
@@ -97,10 +92,11 @@ export default function Layout() {
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
-              <button
+              <Link
                 key={item.title}
+                to={item.path}
                 className={isActive ? 'menu-item-active w-full' : 'menu-item w-full'}
-                onClick={() => handleMenuClick(item.path)}
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                   isActive ? 'bg-cyan-500/20' : 'bg-slate-800'
@@ -108,7 +104,7 @@ export default function Layout() {
                   <item.icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
                 </div>
                 <span>{item.title}</span>
-              </button>
+              </Link>
             );
           })}
         </nav>
