@@ -83,8 +83,8 @@ router.get('/', authenticateToken, async (req: any, res) => {
       branch_name: student.branch_id_obj ? student.branch_id_obj.name : null,
       branch_district: student.branch_id_obj ? student.branch_id_obj.district : null,
       branch_id: student.branch_id ? (typeof student.branch_id === 'object' ? student.branch_id.toString() : student.branch_id) : null,
-      // Parolni ochiq ko'rinishda qaytarish (plainPassword yoki password)
-      plainPassword: student.plainPassword || student.password || ''
+      // Parolni ochiq ko'rinishda qaytarish
+      plainPassword: student.plainPassword || ''
     }));
     
     res.json(formattedStudents);

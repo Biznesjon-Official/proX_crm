@@ -60,9 +60,11 @@ const branchSchema = new mongoose.Schema({
   // Mentor (o'qituvchi) ma'lumotlari
   mentor_name: String,
   mentor_username: String,
+  mentor_password: String, // Ochiq parol (faqat ko'rsatish uchun)
   // Manager ma'lumotlari
   manager_user_name: String,
   manager_username: String,
+  manager_user_password: String, // Ochiq parol (faqat ko'rsatish uchun)
   student_count: { type: Number, default: 0 },
   last_login: { type: Date }, // Oxirgi kirish vaqti
   created_at: { type: Date, default: Date.now },
@@ -95,6 +97,7 @@ const studentSchema = new mongoose.Schema({
   payment_date: Date,
   username: { type: String, sparse: true }, // O'quvchi login (ixtiyoriy, unique emas)
   password: String, // O'quvchi paroli (hash'langan)
+  plainPassword: String, // Ochiq parol (faqat ko'rsatish uchun)
   warnings: [{
     reason: String,
     date: { type: Date, default: Date.now },

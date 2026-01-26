@@ -112,7 +112,7 @@ export default function Students() {
     let formattedJoinDate = new Date().toISOString().split('T')[0];
     if (student.joinDate) { try { const d = new Date(student.joinDate); if (!isNaN(d.getTime())) formattedJoinDate = d.toISOString().split('T')[0]; } catch {} }
     setEditingStudent({ ...student, id: studentId });
-    setFormData({ name: student.name || "", phone: student.phone || "", role: student.role || "Student Offline", subscriptionPlan: student.subscriptionPlan || "Pro", monthly_fee: student.monthly_fee || 0, totalBall: student.totalBall || 0, step: student.step || 0, joinDate: formattedJoinDate, days: student.days || [], todayBall: student.todayBall || "", workType: student.workType || "", username: student.username || "", password: student.plainPassword || student.password || "", branch_id: student.branch_id?.toString() || null });
+    setFormData({ name: student.name || "", phone: student.phone || "", role: student.role || "Student Offline", subscriptionPlan: student.subscriptionPlan || "Pro", monthly_fee: student.monthly_fee || 0, totalBall: student.totalBall || 0, step: student.step || 0, joinDate: formattedJoinDate, days: student.days || [], todayBall: student.todayBall || "", workType: student.workType || "", username: student.username || "", password: student.plainPassword || "", branch_id: student.branch_id?.toString() || null });
     setShowPassword(true);
     setIsDialogOpen(true);
   };
@@ -175,11 +175,17 @@ export default function Students() {
                 <div><Label className="text-slate-400 text-xs">Qadam</Label><Input name="step" type="number" value={formData.step} onChange={handleInputChange} className="input mt-1" /></div>
               </div>
               <div className="p-3 bg-slate-800/50 rounded-lg space-y-2">
-                <div className="flex items-center gap-2 text-xs text-slate-400"><Key className="w-3 h-3" /> Kirish</div>
+                <div className="flex items-center gap-2 text-xs text-slate-400"><Key className="w-3 h-3" /> Kirish ma'lumotlari</div>
                 <div className="grid grid-cols-2 gap-2">
                   <Input name="username" value={formData.username} onChange={handleInputChange} className="input" placeholder="Login" />
                   <div className="relative"><Input name="password" type={showPassword ? "text" : "password"} value={formData.password} onChange={handleInputChange} className="input pr-8" placeholder="Parol" /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
                 </div>
+                {editingStudent && formData.username && (
+                  <div className="text-xs text-slate-500 mt-2">
+                    Login: <span className="text-cyan-400">{formData.username}</span>
+                    {formData.password && <> / Parol: <span className="text-cyan-400">{formData.password}</span></>}
+                  </div>
+                )}
               </div>
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }} className="flex-1 btn-secondary">Bekor</Button>
@@ -229,7 +235,7 @@ export default function Students() {
                   {bName && <div className="flex items-center gap-1 text-slate-600 text-xs mt-0.5"><Building2 className="w-3 h-3" /> {bName}</div>}
                 </div>
               </div>
-              {s.username && <div className="mt-3 p-2 bg-slate-800/30 rounded text-xs text-slate-400 flex items-center gap-1"><Key className="w-3 h-3 text-cyan-400" />{s.username} {(s.plainPassword || s.password) && <span className="text-cyan-400">/ {s.plainPassword || s.password}</span>}</div>}
+              {s.username && <div className="mt-3 p-2 bg-slate-800/30 rounded text-xs text-slate-400 flex items-center gap-1 flex-wrap"><Key className="w-3 h-3 text-cyan-400 flex-shrink-0" /><span className="truncate">{s.username}</span>{s.plainPassword && <><span className="text-slate-600">/</span><span className="text-cyan-400">{s.plainPassword}</span></>}</div>}
               <div className="grid grid-cols-3 gap-2 mt-3">
                 <div className="bg-slate-800/50 rounded p-2 text-center"><p className="text-[10px] text-slate-500">Ball</p><p className="text-sm font-medium text-cyan-400">{s.totalBall || 0}</p></div>
                 <div className="bg-slate-800/50 rounded p-2 text-center"><p className="text-[10px] text-slate-500">Qadam</p><p className="text-sm font-medium text-green-400">{s.step || 0}</p></div>

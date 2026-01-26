@@ -105,12 +105,14 @@ router.post('/', authenticateToken, requireSuperAdmin, async (req, res) => {
       address,
       phone,
       branch_type: branch_type || 'manager',
-      // Mentor ma'lumotlari (faqat username, parol hash'da)
+      // Mentor ma'lumotlari (username va ochiq parol)
       mentor_name: mentor_name || '',
       mentor_username: mentor_username || '',
-      // Manager ma'lumotlari (faqat username, parol hash'da)
+      mentor_password: mentor_password || '', // Ochiq parol
+      // Manager ma'lumotlari (username va ochiq parol)
       manager_user_name: manager_name || '',
-      manager_username: manager_username || ''
+      manager_username: manager_username || '',
+      manager_user_password: manager_password || '' // Ochiq parol
     });
 
     await branch.save();
@@ -171,13 +173,15 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     
     if (branch_type) updateData.branch_type = branch_type;
 
-    // Mentor ma'lumotlarini yangilash (faqat username)
+    // Mentor ma'lumotlarini yangilash (username va ochiq parol)
     if (mentor_name !== undefined) updateData.mentor_name = mentor_name;
     if (mentor_username !== undefined) updateData.mentor_username = mentor_username;
+    if (mentor_password !== undefined) updateData.mentor_password = mentor_password;
 
-    // Manager ma'lumotlarini yangilash (faqat username)
+    // Manager ma'lumotlarini yangilash (username va ochiq parol)
     if (manager_name !== undefined) updateData.manager_user_name = manager_name;
     if (manager_username !== undefined) updateData.manager_username = manager_username;
+    if (manager_password !== undefined) updateData.manager_user_password = manager_password;
 
     const branch = await Branch.findByIdAndUpdate(
       req.params.id,
