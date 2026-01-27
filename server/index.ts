@@ -29,24 +29,41 @@ export async function createServer() {
   }));
 
   // CORS Configuration
-  const allowedOrigins = process.env.FRONTEND_URL 
-    ? [process.env.FRONTEND_URL] 
-    : ['http://localhost:5173', 'http://localhost:3000'];
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://crm.prox.uz',
+    'https://prox.uz',
+    'http://crm.prox.uz',
+    'http://prox.uz'
+  ];
+  
+  // .env dan qo'shimcha origin qo'shish
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+  }
   
   app.use(cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
+      // Allow requests with no origin (mobile apps, Postman, curl, etc.)
       if (!origin) return callback(null, true);
       
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      // Development rejimda barcha originlarni ruxsat etish
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      
+      // Production da faqat allowed origins
+      if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
+        console.warn(`❌ CORS blocked: ${origin}`);
         callback(new Error('CORS policy: Origin not allowed'));
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   }));
 
   // Body Parser with size limit (DoS protection)
