@@ -124,7 +124,7 @@ export default function StudentOpenSteps() {
       
       // Fayl nomini yaratish
       const currentDate = new Date().toLocaleDateString('uz-UZ').replace(/\./g, '-');
-      const branchName = selectedBranch ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
+      const branchName = selectedBranch?.name ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
       const fileName = `Oquvchilar_qadamlari_${branchName}_${currentDate}.xlsx`;
       
       // Faylni yuklab olish

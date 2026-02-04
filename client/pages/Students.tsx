@@ -11,6 +11,7 @@ import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Ke
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "../hooks/useAuth";
 import { useDebounce } from "../hooks/useDebounce";
+import { useBranchContext } from "../hooks/useBranchContext";
 import api from "@/lib/axios";
 import { StudentCardSkeletonGrid } from "@/components/StudentCardSkeleton";
 import EmptyState from "@/components/EmptyState";
@@ -37,6 +38,7 @@ export default function Students() {
 
   const { toast } = useToast();
   const { user } = useAuth();
+  const { selectedBranch } = useBranchContext();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -250,7 +252,7 @@ export default function Students() {
       
       // Fayl nomini yaratish
       const currentDate = new Date().toLocaleDateString('uz-UZ').replace(/\./g, '-');
-      const branchName = selectedBranch ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
+      const branchName = selectedBranch?.name ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
       const fileName = `Oquvchilar_${branchName}_${currentDate}.xlsx`;
       
       // Faylni yuklab olish
