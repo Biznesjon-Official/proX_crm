@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
-import { Users, TrendingUp, Award, Target, Building2, Clock, RefreshCw } from "lucide-react";
+import { Users, TrendingUp, Award, Target, Building2, Clock, RefreshCw, AlertTriangle, Shield } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useBranchContext } from "../hooks/useBranchContext";
 import api from "@/lib/axios";
@@ -55,6 +55,16 @@ export default function Dashboard() {
   const totalStudents = filteredStudents?.length || 0;
   const avgPercentage = progressStats?.avg_percentage ? Math.round(progressStats.avg_percentage) : 0;
 
+  // Ogohlantirish statistikasi
+  const warningStats = React.useMemo(() => {
+    if (!filteredStudents) return { withWarnings: 0, blocked: 0 };
+    
+    const withWarnings = filteredStudents.filter((s: any) => s.warnings && s.warnings.length > 0).length;
+    const blocked = filteredStudents.filter((s: any) => s.is_blocked).length;
+    
+    return { withWarnings, blocked };
+  }, [filteredStudents]);
+
   const growthPercentage = React.useMemo(() => {
     if (progressStats?.growth_percentage !== undefined) return progressStats.growth_percentage;
     if (!filteredStudents || filteredStudents.length === 0) return 0;
@@ -94,7 +104,7 @@ export default function Dashboard() {
     { label: "Jami O'quvchilar", value: totalStudents, change: `+${growthPercentage}%`, icon: Users, color: "cyan", loading: studentsLoading },
     { label: "O'rtacha Foiz", value: `${avgPercentage}%`, icon: TrendingUp, color: "green", loading: statsLoading },
     { label: "A'lo O'quvchilar", value: progressStats?.excellent_students || 0, sub: "80%+", icon: Award, color: "purple", loading: statsLoading },
-    { label: "Jami Ball", value: (progressStats?.total_points || 0).toLocaleString(), icon: Target, color: "orange", loading: statsLoading },
+    { label: "Ogohlantirishlar", value: warningStats.withWarnings, sub: `${warningStats.blocked} bloklangan`, icon: AlertTriangle, color: "orange", loading: studentsLoading },
   ];
 
   const colors: Record<string, string> = {

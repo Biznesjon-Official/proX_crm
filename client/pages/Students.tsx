@@ -4,9 +4,10 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key } from "lucide-react";
+import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key, AlertTriangle, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "../hooks/useAuth";
 import { useDebounce } from "../hooks/useDebounce";
@@ -24,6 +25,9 @@ export default function Students() {
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; student: any | null }>({ open: false, student: null });
+  const [warningDialog, setWarningDialog] = useState<{ open: boolean; student: any | null }>({ open: false, student: null });
+  const [warningReason, setWarningReason] = useState("");
+  const [unblockConfirm, setUnblockConfirm] = useState<{ open: boolean; student: any | null }>({ open: false, student: null });
   const [formData, setFormData] = useState({
     name: "", phone: "", role: "Student Offline", subscriptionPlan: "Pro",
     monthly_fee: 0, totalBall: 0, step: 0, joinDate: new Date().toISOString().split('T')[0],
@@ -86,6 +90,40 @@ export default function Students() {
     onError: () => toast({ title: "Xatolik!", variant: "destructive" })
   });
 
+  const warningMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => 
+      api.post(`/students-mongo/${id}/warning`, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students-mongo'] });
+      setWarningDialog({ open: false, student: null });
+      setWarningReason("");
+      toast({ title: "Muvaffaqiyat!", description: "Ogohlantirish berildi" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Xatolik!", 
+        description: error.response?.data?.error || "Xatolik", 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/students-mongo/${id}/unblock`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students-mongo'] });
+      setUnblockConfirm({ open: false, student: null });
+      toast({ title: "Muvaffaqiyat!", description: "Blok olib tashlandi" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Xatolik!", 
+        description: error.response?.data?.error || "Xatolik", 
+        variant: "destructive" 
+      });
+    }
+  });
+
   const resetForm = () => {
     let initialBranchId = "";
     if ((user?.role === 'mentor' || user?.role === 'manager') && user?.branch_id) initialBranchId = user.branch_id;
@@ -121,10 +159,32 @@ export default function Students() {
     setDeleteConfirm({ open: true, student });
   };
 
+  const handleWarning = (student: any) => {
+    setWarningDialog({ open: true, student });
+  };
+
+  const handleUnblock = (student: any) => {
+    setUnblockConfirm({ open: true, student });
+  };
+
   const confirmDelete = () => {
     const studentId = deleteConfirm.student?.id || deleteConfirm.student?._id;
     if (studentId) {
       deleteMutation.mutate(studentId);
+    }
+  };
+
+  const confirmWarning = () => {
+    const studentId = warningDialog.student?.id || warningDialog.student?._id;
+    if (studentId && warningReason.trim()) {
+      warningMutation.mutate({ id: studentId, reason: warningReason.trim() });
+    }
+  };
+
+  const confirmUnblock = () => {
+    const studentId = unblockConfirm.student?.id || unblockConfirm.student?._id;
+    if (studentId) {
+      unblockMutation.mutate(studentId);
     }
   };
 
@@ -242,8 +302,43 @@ export default function Students() {
                 <div className="bg-slate-800/50 rounded p-2 text-center"><p className="text-[10px] text-slate-500">To'lov</p><p className="text-sm font-medium text-purple-400">{(s.monthly_fee || 0).toLocaleString()}</p></div>
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/50" onClick={(e) => e.stopPropagation()}>
-                <span className="text-xs text-slate-500">{s.joinDate ? new Date(s.joinDate).toLocaleDateString('ru-RU') : ''}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{s.joinDate ? new Date(s.joinDate).toLocaleDateString('ru-RU') : ''}</span>
+                  {/* Ogohlantirish va blok holati */}
+                  {s.warnings && s.warnings.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 text-orange-400" />
+                      <span className="text-xs text-orange-400">{s.warnings.length}/3</span>
+                    </div>
+                  )}
+                  {s.is_blocked && (
+                    <div className="flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-red-400" />
+                      <span className="text-xs text-red-400">Bloklangan</span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex gap-1">
+                  {/* Blokni ochish tugmasi */}
+                  {s.is_blocked && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleUnblock(s); }} 
+                      className="p-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                      title="Blokni ochish"
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {/* Ogohlantirish berish tugmasi */}
+                  {!s.is_blocked && (user?.role === 'mentor' || user?.role === 'manager' || user?.role === 'super_admin') && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleWarning(s); }} 
+                      className="p-1.5 rounded bg-orange-500/10 text-orange-400 hover:bg-orange-500/20"
+                      title="Ogohlantirish berish"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button onClick={(e) => { e.stopPropagation(); handleEdit(s); }} className="p-1.5 rounded bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"><Edit className="w-3.5 h-3.5" /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleDelete(s); }} className="p-1.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
@@ -266,6 +361,81 @@ export default function Students() {
         variant="danger"
         icon="delete"
         isLoading={deleteMutation.isPending}
+      />
+
+      {/* Warning Dialog */}
+      <Dialog open={warningDialog.open} onOpenChange={(open) => {
+        setWarningDialog({ open, student: null });
+        setWarningReason("");
+      }}>
+        <DialogContent className="max-w-md card border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+              Ogohlantirish berish
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-slate-800/50 rounded-lg">
+              <p className="text-sm text-slate-300">O'quvchi: <span className="text-white font-medium">{warningDialog.student?.name}</span></p>
+              <p className="text-xs text-slate-500 mt-1">
+                Hozirgi ogohlantirishlar: {warningDialog.student?.warnings?.length || 0}/3
+              </p>
+            </div>
+            <div>
+              <Label className="text-slate-400 text-sm">Ogohlantirish sababi</Label>
+              <textarea
+                value={warningReason}
+                onChange={(e) => setWarningReason(e.target.value)}
+                className="input mt-2 min-h-[80px] resize-none"
+                placeholder="Ogohlantirish sababini kiriting..."
+                maxLength={200}
+              />
+              <p className="text-xs text-slate-500 mt-1">{warningReason.length}/200</p>
+            </div>
+            {warningDialog.student?.warnings?.length === 2 && (
+              <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                <p className="text-sm text-red-300 font-medium">⚠️ Diqqat!</p>
+                <p className="text-xs text-red-400 mt-1">
+                  Bu 3-chi ogohlantirish bo'ladi va o'quvchi avtomatik ravishda 1 yilga bloklanadi.
+                </p>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setWarningDialog({ open: false, student: null });
+                  setWarningReason("");
+                }} 
+                className="flex-1 btn-secondary"
+              >
+                Bekor qilish
+              </Button>
+              <button 
+                onClick={confirmWarning}
+                disabled={!warningReason.trim() || warningMutation.isPending}
+                className="flex-1 btn-primary bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+              >
+                {warningMutation.isPending ? "Yuklanmoqda..." : "Ogohlantirish berish"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unblock Confirm Dialog */}
+      <ConfirmDialog
+        open={unblockConfirm.open}
+        onOpenChange={(open) => setUnblockConfirm({ open, student: null })}
+        onConfirm={confirmUnblock}
+        title="Blokni ochish"
+        description={`${unblockConfirm.student?.name} ning blokini ochmoqchimisiz? Barcha ogohlantirishlar ham o'chiriladi.`}
+        confirmText="Blokni ochish"
+        cancelText="Bekor qilish"
+        variant="warning"
+        icon="warning"
+        isLoading={unblockMutation.isPending}
       />
     </div>
   );
