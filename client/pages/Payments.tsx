@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, Search, Phone, CheckCircle, XCircle, X } from "lucide-react";
+import { DollarSign, Search, Phone, CheckCircle, XCircle, X, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBranchContext } from "@/hooks/useBranchContext";
 import api from "@/lib/axios";
+import * as XLSX from 'xlsx';
 
 interface Student {
   _id: string;
@@ -51,6 +52,62 @@ export default function Payments() {
     updatePaymentMutation.mutate({ studentId: student._id || student.id!, isPaid: !isPaid });
   };
 
+  const exportToExcel = () => {
+    try {
+      // Ma'lumotlarni tayyorlash
+      const exportData = filteredStudents.map((student, index) => ({
+        '№': index + 1,
+        'Ism': student.name || '',
+        'Telefon': student.phone || '',
+        'Oylik to\'lov': student.monthly_fee || 0,
+        'To\'lov holati': student.current_month_payment === 'paid' ? 'To\'langan' : 'To\'lanmagan',
+        'Oxirgi to\'lov': student.last_payment_date ? new Date(student.last_payment_date).toLocaleDateString('uz-UZ') : 'Hech qachon',
+        'Bloklangan': student.is_blocked ? 'Ha' : 'Yo\'q',
+        'Holat': student.current_month_payment === 'paid' ? '✅ To\'langan' : 
+                currentDay <= 10 ? '⏳ Kutilmoqda' : '❌ Muddat o\'tgan'
+      }));
+
+      // Excel fayl yaratish
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      
+      // Ustun kengliklarini sozlash
+      const columnWidths = [
+        { wch: 5 },   // №
+        { wch: 20 },  // Ism
+        { wch: 15 },  // Telefon
+        { wch: 12 },  // Oylik to'lov
+        { wch: 15 },  // To'lov holati
+        { wch: 15 },  // Oxirgi to'lov
+        { wch: 12 },  // Bloklangan
+        { wch: 15 }   // Holat
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'To\'lovlar');
+      
+      // Fayl nomini yaratish
+      const currentDate = new Date().toLocaleDateString('uz-UZ').replace(/\./g, '-');
+      const branchName = selectedBranch ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
+      const fileName = `Tolovlar_${branchName}_${currentDate}.xlsx`;
+      
+      // Faylni yuklab olish
+      XLSX.writeFile(workbook, fileName);
+      
+      toast({
+        title: "Muvaffaqiyat!",
+        description: `Excel fayl yuklab olindi: ${fileName}`
+      });
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "Excel faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
   const filteredStudents = useMemo(() => {
     return students.filter((s: Student) => {
       const isStudentOffline = s.role === 'Student Offline';
@@ -87,6 +144,16 @@ export default function Payments() {
           </div>
         </div>
         <div className="flex gap-3">
+          {/* Excel Export tugmasi */}
+          <button
+            onClick={exportToExcel}
+            disabled={filteredStudents.length === 0}
+            className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Excel'ga export qilish"
+          >
+            <Download className="w-4 h-4" />
+            <span className="text-xs">Excel</span>
+          </button>
           <div className="px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
             <span className="text-xs text-green-400">To'langan: {paidCount}</span>
           </div>

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key, AlertTriangle, Shield } from "lucide-react";
+import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key, AlertTriangle, Shield, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "../hooks/useAuth";
 import { useDebounce } from "../hooks/useDebounce";
@@ -15,6 +15,7 @@ import api from "@/lib/axios";
 import { StudentCardSkeletonGrid } from "@/components/StudentCardSkeleton";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import * as XLSX from 'xlsx';
 
 export default function Students() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -188,6 +189,87 @@ export default function Students() {
     }
   };
 
+  const exportToExcel = () => {
+    try {
+      // Ma'lumotlarni tayyorlash
+      const exportData = filteredStudents.map((student: any, index: number) => {
+        const branch = typeof student.branch_id === 'object' 
+          ? student.branch_id 
+          : branches.find((b: any) => (b.id || b._id) === student.branch_id);
+        
+        return {
+          '№': index + 1,
+          'Ism': student.name || '',
+          'Telefon': student.phone || '',
+          'Login': student.username || '',
+          'Parol': student.plainPassword || '',
+          'Tarif': student.subscriptionPlan || 'Pro',
+          'Oylik to\'lov': student.monthly_fee || 0,
+          'Ball': student.totalBall || 0,
+          'Qadam': student.step || 0,
+          'Filial': branch?.name || 'Filialsiz',
+          'Tuman': branch?.district || '',
+          'Qo\'shilgan sana': student.joinDate ? new Date(student.joinDate).toLocaleDateString('uz-UZ') : '',
+          'Ogohlantirishlar': student.warnings?.length || 0,
+          'Bloklangan': student.is_blocked ? 'Ha' : 'Yo\'q',
+          'Blok sanasi': student.blocked_at ? new Date(student.blocked_at).toLocaleDateString('uz-UZ') : '',
+          'To\'lov holati': student.current_month_payment === 'paid' ? 'To\'langan' : 'To\'lanmagan',
+          'Oxirgi to\'lov': student.last_payment_date ? new Date(student.last_payment_date).toLocaleDateString('uz-UZ') : '',
+          'Yaratilgan': student.created_at ? new Date(student.created_at).toLocaleDateString('uz-UZ') : ''
+        };
+      });
+
+      // Excel fayl yaratish
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      
+      // Ustun kengliklarini sozlash
+      const columnWidths = [
+        { wch: 5 },   // №
+        { wch: 20 },  // Ism
+        { wch: 15 },  // Telefon
+        { wch: 15 },  // Login
+        { wch: 12 },  // Parol
+        { wch: 8 },   // Tarif
+        { wch: 12 },  // Oylik to'lov
+        { wch: 8 },   // Ball
+        { wch: 8 },   // Qadam
+        { wch: 15 },  // Filial
+        { wch: 12 },  // Tuman
+        { wch: 15 },  // Qo'shilgan sana
+        { wch: 12 },  // Ogohlantirishlar
+        { wch: 10 },  // Bloklangan
+        { wch: 12 },  // Blok sanasi
+        { wch: 12 },  // To'lov holati
+        { wch: 12 },  // Oxirgi to'lov
+        { wch: 12 }   // Yaratilgan
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'O\'quvchilar');
+      
+      // Fayl nomini yaratish
+      const currentDate = new Date().toLocaleDateString('uz-UZ').replace(/\./g, '-');
+      const branchName = selectedBranch ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
+      const fileName = `Oquvchilar_${branchName}_${currentDate}.xlsx`;
+      
+      // Faylni yuklab olish
+      XLSX.writeFile(workbook, fileName);
+      
+      toast({
+        title: "Muvaffaqiyat!",
+        description: `Excel fayl yuklab olindi: ${fileName}`
+      });
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "Excel faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
   const filteredStudents = (students as any[]).filter((s: any) => {
     const matchesSearch = !debouncedSearch || s.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) || s.phone?.includes(debouncedSearch);
     const sBranchId = typeof s.branch_id === 'object' ? s.branch_id?._id?.toString() : s.branch_id?.toString();
@@ -207,8 +289,19 @@ export default function Students() {
             <p className="text-xs text-slate-500">Jami: {students.length}</p>
           </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) resetForm(); }}>
-          <DialogTrigger asChild><button className="btn-primary flex items-center gap-2" onClick={resetForm}><Plus className="w-4 h-4" /> Yangi</button></DialogTrigger>
+        <div className="flex gap-2">
+          {/* Excel Export tugmasi */}
+          <button 
+            onClick={exportToExcel}
+            disabled={filteredStudents.length === 0}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Excel'ga export qilish"
+          >
+            <Download className="w-4 h-4" />
+            Excel
+          </button>
+          <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) resetForm(); }}>
+            <DialogTrigger asChild><button className="btn-primary flex items-center gap-2" onClick={resetForm}><Plus className="w-4 h-4" /> Yangi</button></DialogTrigger>
           <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto card border-slate-700">
             <DialogHeader><DialogTitle className="text-white">{editingStudent ? "Tahrirlash" : "Yangi o'quvchi"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -254,6 +347,7 @@ export default function Students() {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, TrendingUp, Award, Search, RefreshCw, TrendingDown } from "lucide-react";
+import { Users, TrendingUp, Award, Search, RefreshCw, TrendingDown, Download } from "lucide-react";
 import { useBranchContext } from "@/hooks/useBranchContext";
 import api from "@/lib/axios";
+import * as XLSX from 'xlsx';
+import { useToast } from "@/hooks/use-toast";
 
 interface StudentStep {
   _id: string;
@@ -20,6 +22,7 @@ export default function StudentOpenSteps() {
   const [sortBy, setSortBy] = useState<"currentStep" | "progress">("currentStep");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { selectedBranch } = useBranchContext();
+  const { toast } = useToast();
 
   const { data: students = [], isLoading, refetch } = useQuery<StudentStep[]>({
     queryKey: ["students-with-steps"],
@@ -83,6 +86,64 @@ export default function StudentOpenSteps() {
     }
   };
 
+  const exportToExcel = () => {
+    try {
+      // Ma'lumotlarni tayyorlash
+      const exportData = sortedStudents.map((student, index) => ({
+        '№': index + 1,
+        'Ism': student.fullName || '',
+        'Login': student.login || '',
+        'Hozirgi qadam (prox.uz)': student.currentStep || 0,
+        'Jami qadam (CRM)': student.step || 0,
+        'Qadam farqi': (student.step || 0) - (student.currentStep || 0),
+        'Ball': student.totalBall || 0,
+        'Progress (%)': student.progress || 0,
+        'Holat': student.currentStep === 0 ? 'Boshlamagan' : 
+                student.currentStep >= student.step ? 'Yaxshi' : 'Orqada qolgan'
+      }));
+
+      // Excel fayl yaratish
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      
+      // Ustun kengliklarini sozlash
+      const columnWidths = [
+        { wch: 5 },   // №
+        { wch: 20 },  // Ism
+        { wch: 15 },  // Login
+        { wch: 18 },  // Hozirgi qadam
+        { wch: 15 },  // Jami qadam
+        { wch: 12 },  // Qadam farqi
+        { wch: 8 },   // Ball
+        { wch: 12 },  // Progress
+        { wch: 15 }   // Holat
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'O\'quvchilar_qadamlari');
+      
+      // Fayl nomini yaratish
+      const currentDate = new Date().toLocaleDateString('uz-UZ').replace(/\./g, '-');
+      const branchName = selectedBranch ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
+      const fileName = `Oquvchilar_qadamlari_${branchName}_${currentDate}.xlsx`;
+      
+      // Faylni yuklab olish
+      XLSX.writeFile(workbook, fileName);
+      
+      toast({
+        title: "Muvaffaqiyat!",
+        description: `Excel fayl yuklab olindi: ${fileName}`
+      });
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "Excel faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -104,13 +165,25 @@ export default function StudentOpenSteps() {
             O'quvchilarning qadam va natijalarini kuzatish
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="p-2 sm:px-3 sm:py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/30 transition flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span className="hidden sm:inline text-sm">Yangilash</span>
-        </button>
+        <div className="flex gap-2">
+          {/* Excel Export tugmasi */}
+          <button
+            onClick={exportToExcel}
+            disabled={sortedStudents.length === 0}
+            className="p-2 sm:px-3 sm:py-2 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg hover:bg-green-500/30 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Excel'ga export qilish"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline text-sm">Excel</span>
+          </button>
+          <button
+            onClick={() => refetch()}
+            className="p-2 sm:px-3 sm:py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/30 transition flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span className="hidden sm:inline text-sm">Yangilash</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
