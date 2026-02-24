@@ -167,7 +167,7 @@ export async function restoreBackup(backupName: string): Promise<{ success: bool
 /**
  * List all available backups
  */
-export async function listBackups(): Promise<{ name: string; size: string; date: Date }[]> {
+export async function listBackups(): Promise<{ name: string; size: string; date: string }[]> {
   try {
     await ensureBackupDir();
 
@@ -204,13 +204,13 @@ export async function listBackups(): Promise<{ name: string; size: string; date:
         backups.push({
           name: file,
           size: formatBytes(totalSize),
-          date: stats.mtime
+          date: stats.mtime.toISOString() // Convert to ISO string for JSON serialization
         });
       }
     }
 
     // Sort by date (newest first)
-    backups.sort((a, b) => b.date.getTime() - a.date.getTime());
+    backups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return backups;
   } catch (error: any) {
@@ -309,8 +309,8 @@ export function scheduleBackups(): void {
 export async function getBackupStats(): Promise<{
   totalBackups: number;
   totalSize: string;
-  oldestBackup: Date | null;
-  newestBackup: Date | null;
+  oldestBackup: string | null;
+  newestBackup: string | null;
 }> {
   try {
     const backups = await listBackups();

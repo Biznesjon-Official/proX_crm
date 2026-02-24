@@ -4,10 +4,9 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key, AlertTriangle, Shield, Download } from "lucide-react";
+import { Edit, Trash2, Users, Search, X, Building2, Plus, Phone, Eye, EyeOff, Key, AlertTriangle, Shield, FileSpreadsheet, FileText, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "../hooks/useAuth";
 import { useDebounce } from "../hooks/useDebounce";
@@ -17,6 +16,9 @@ import { StudentCardSkeletonGrid } from "@/components/StudentCardSkeleton";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 export default function Students() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,6 +32,7 @@ export default function Students() {
   const [warningDialog, setWarningDialog] = useState<{ open: boolean; student: any | null }>({ open: false, student: null });
   const [warningReason, setWarningReason] = useState("");
   const [unblockConfirm, setUnblockConfirm] = useState<{ open: boolean; student: any | null }>({ open: false, student: null });
+  const [exportFormat, setExportFormat] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "", phone: "", role: "Student Offline", subscriptionPlan: "Pro",
     monthly_fee: 0, totalBall: 0, step: 0, joinDate: new Date().toISOString().split('T')[0],
@@ -257,16 +260,224 @@ export default function Students() {
       
       // Faylni yuklab olish
       XLSX.writeFile(workbook, fileName);
-      
-      toast({
-        title: "Muvaffaqiyat!",
-        description: `Excel fayl yuklab olindi: ${fileName}`
-      });
     } catch (error) {
       console.error('Excel export error:', error);
       toast({
         title: "Xatolik!",
         description: "Excel faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToPNG = async () => {
+    try {
+      // Jadval uchun HTML element yaratish
+      const tableContainer = document.createElement('div');
+      tableContainer.style.position = 'absolute';
+      tableContainer.style.left = '-9999px';
+      tableContainer.style.background = 'white';
+      tableContainer.style.padding = '30px';
+      
+      // Sarlavha
+      const branchName = selectedBranch?.name || 'Barcha filiallar';
+      const currentDate = new Date().toLocaleDateString('uz-UZ');
+      
+      tableContainer.innerHTML = `
+        <div style="font-family: Arial, sans-serif; width: 1800px;">
+          <h2 style="color: #0ea5e9; margin-bottom: 15px; font-size: 32px;">O'quvchilar ro'yxati</h2>
+          <div style="display: flex; gap: 40px; margin-bottom: 20px; color: #475569; font-size: 18px;">
+            <span>Filial: <strong style="color: #1e293b;">${branchName}</strong></span>
+            <span>Sana: <strong style="color: #1e293b;">${currentDate}</strong></span>
+            <span>Jami: <strong style="color: #1e293b;">${filteredStudents.length} ta</strong></span>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 18px;">
+            <thead>
+              <tr style="background: #0ea5e9; color: white;">
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">№</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Ism</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Telefon</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Login</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Tarif</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: right; font-size: 18px;">To'lov</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Ball</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Qadam</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Filial</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Sana</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Ogoh</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Blok</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredStudents.map((student: any, index: number) => {
+                const branch = typeof student.branch_id === 'object' 
+                  ? student.branch_id 
+                  : branches.find((b: any) => (b.id || b._id) === student.branch_id);
+                const bgColor = index % 2 === 0 ? '#f1f5f9' : 'white';
+                
+                return `
+                  <tr style="background: ${bgColor};">
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${index + 1}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-weight: 700; font-size: 18px;">${student.name || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-size: 18px; font-weight: 600;">${student.phone || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-size: 18px; font-weight: 600;">${student.username || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.subscriptionPlan || 'Pro'}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: right; color: #1e293b; font-size: 18px; font-weight: 600;">${(student.monthly_fee || 0).toLocaleString()}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.totalBall || 0}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.step || 0}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-size: 18px; font-weight: 600;">${branch?.name || '-'}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.joinDate ? new Date(student.joinDate).toLocaleDateString('uz-UZ') : ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.warnings?.length || 0}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.is_blocked ? 'Ha' : "Yo'q"}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.body.appendChild(tableContainer);
+      
+      // Screenshot olish
+      const canvas = await html2canvas(tableContainer, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      
+      // PNG ga konvert qilish
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Yuklab olish
+      const link = document.createElement('a');
+      link.download = `Oquvchilar_${branchName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate.replace(/\./g, '-')}.png`;
+      link.href = imgData;
+      link.click();
+      
+      // Tozalash
+      document.body.removeChild(tableContainer);
+    } catch (error) {
+      console.error('PNG export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "PNG faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+      
+      // Sarlavha
+      doc.setFontSize(14);
+      doc.text("O'quvchilar ro'yxati", 14, 12);
+      
+      // Filial va sana ma'lumotlari
+      doc.setFontSize(9);
+      const branchName = selectedBranch?.name || 'Barcha filiallar';
+      const currentDate = new Date().toLocaleDateString('uz-UZ');
+      doc.text(`Filial: ${branchName}`, 14, 18);
+      doc.text(`Sana: ${currentDate}`, 100, 18);
+      doc.text(`Jami: ${filteredStudents.length} ta`, 180, 18);
+      
+      // Jadval uchun ma'lumotlarni tayyorlash
+      const tableData = filteredStudents.map((student: any, index: number) => {
+        const branch = typeof student.branch_id === 'object' 
+          ? student.branch_id 
+          : branches.find((b: any) => (b.id || b._id) === student.branch_id);
+        
+        return [
+          index + 1,
+          student.name || '',
+          student.phone || '',
+          student.username || '',
+          student.subscriptionPlan || 'Pro',
+          (student.monthly_fee || 0).toLocaleString(),
+          student.totalBall || 0,
+          student.step || 0,
+          branch?.name || '-',
+          student.joinDate ? new Date(student.joinDate).toLocaleDateString('uz-UZ') : '',
+          student.warnings?.length || 0,
+          student.is_blocked ? 'Ha' : "Yo'q"
+        ];
+      });
+
+      // Jadval yaratish
+      autoTable(doc, {
+        startY: 22,
+        head: [[
+          '№',
+          'Ism',
+          'Telefon',
+          'Login',
+          'Tarif',
+          "To'lov",
+          'Ball',
+          'Qadam',
+          'Filial',
+          'Sana',
+          'Ogoh',
+          'Blok'
+        ]],
+        body: tableData,
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.5,
+          overflow: 'linebreak',
+          halign: 'left',
+          valign: 'middle'
+        },
+        headStyles: {
+          fillColor: [14, 165, 233], // cyan-500
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center',
+          fontSize: 7
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252] // slate-50
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },   // №
+          1: { cellWidth: 35 },                     // Ism
+          2: { cellWidth: 22 },                     // Telefon
+          3: { cellWidth: 22 },                     // Login
+          4: { cellWidth: 12, halign: 'center' },   // Tarif
+          5: { cellWidth: 18, halign: 'right' },    // To'lov
+          6: { cellWidth: 12, halign: 'center' },   // Ball
+          7: { cellWidth: 12, halign: 'center' },   // Qadam
+          8: { cellWidth: 30 },                     // Filial
+          9: { cellWidth: 20, halign: 'center' },   // Sana
+          10: { cellWidth: 12, halign: 'center' },  // Ogoh
+          11: { cellWidth: 12, halign: 'center' }   // Blok
+        },
+        margin: { top: 22, left: 10, right: 10, bottom: 10 },
+        didDrawPage: (data: any) => {
+          // Sahifa raqami
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(7);
+          doc.text(
+            `Sahifa ${data.pageNumber} / ${pageCount}`,
+            doc.internal.pageSize.width / 2,
+            doc.internal.pageSize.height - 5,
+            { align: 'center' }
+          );
+        }
+      });
+
+      // Fayl nomini yaratish
+      const fileName = `Oquvchilar_${branchName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate.replace(/\./g, '-')}.pdf`;
+      
+      // PDF ni yuklab olish
+      doc.save(fileName);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "PDF faylni yaratishda xatolik yuz berdi",
         variant: "destructive"
       });
     }
@@ -292,16 +503,46 @@ export default function Students() {
           </div>
         </div>
         <div className="flex gap-2">
-          {/* Excel Export tugmasi */}
-          <button 
-            onClick={exportToExcel}
-            disabled={filteredStudents.length === 0}
-            className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Excel'ga export qilish"
-          >
-            <Download className="w-4 h-4" />
-            Excel
-          </button>
+          {/* Export Select */}
+          <div className="flex items-center gap-2">
+            <Select value={exportFormat} onValueChange={(value) => {
+              setExportFormat(value);
+              // Tanlangandan keyin darhol export qilish
+              setTimeout(() => {
+                if (value === 'excel') exportToExcel();
+                else if (value === 'pdf') exportToPDF();
+                else if (value === 'png') exportToPNG();
+                setExportFormat("");
+              }, 100);
+            }}>
+              <SelectTrigger className="input w-40">
+                <div className="flex items-center gap-2">
+                  <Download className="w-4 h-4" />
+                  <span>Yuklash</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent className="card border-slate-700">
+                <SelectItem value="excel">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                    <span>Excel</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="pdf">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-red-400" />
+                    <span>PDF</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="png">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <span>PNG Rasm</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild><button className="btn-primary flex items-center gap-2" onClick={resetForm}><Plus className="w-4 h-4" /> Yangi</button></DialogTrigger>
           <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto card border-slate-700">

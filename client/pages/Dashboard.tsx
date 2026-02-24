@@ -124,7 +124,7 @@ export default function Dashboard() {
             {selectedBranch ? `${selectedBranch.name} - Statistika` : 'Tizim statistikasi'}
           </p>
         </div>
-        <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2">
+        <button onClick={() => window.location.reload()} className="btn-secondary flex items-center gap-2">
           <RefreshCw className="w-4 h-4" />
           Yangilash
         </button>

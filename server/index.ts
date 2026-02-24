@@ -10,7 +10,7 @@ import studentProgressRouter from './routes/student-progress.js';
 import progressMongoRouter from './routes/progress-mongo.js';
 import paymentsMongoRouter from './routes/payments-mongo.js';
 import authRouter from './routes/auth.js';
-// import backupRouter from './routes/backup.js'; // TODO: Fix export issue
+import backupRouter from './routes/backup.js';
 import examResultsRouter from './routes/exam-results.js';
 import { startPaymentScheduler } from './utils/paymentScheduler.js';
 import { scheduleBackups } from './utils/backup.js';
@@ -120,7 +120,7 @@ export async function createServer() {
   app.use('/api/progress-mongo', progressMongoRouter); // Backward compatibility
   app.use('/api/payments', paymentsMongoRouter); // MongoDB payments
   app.use('/api/exam-results', examResultsRouter); // Exam results
-  // app.use('/api/backup', backupRouter); // Backup system - TODO: Fix export issue
+  app.use('/api/backup', backupRouter); // Backup system
 
   // Health check
   app.get('/api/health', (_req, res) => {

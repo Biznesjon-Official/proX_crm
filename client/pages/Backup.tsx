@@ -32,7 +32,11 @@ export default function Backup() {
 
   const { data: backups = [], isLoading } = useQuery<Backup[]>({
     queryKey: ["backups"],
-    queryFn: () => api.get("/backup").then(res => res.data),
+    queryFn: async () => {
+      const res = await api.get("/backup");
+      // Ensure we always return an array
+      return Array.isArray(res.data) ? res.data : [];
+    },
     refetchInterval: 30000 // 30 sekund
   });
 

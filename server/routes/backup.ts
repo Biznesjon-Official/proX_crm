@@ -14,10 +14,12 @@ const router = Router();
 router.get('/', authenticateToken, requireSuperAdmin, async (_req, res) => {
   try {
     const backups = await listBackups();
-    res.json(backups);
+    // Always return an array, even if empty
+    res.json(Array.isArray(backups) ? backups : []);
   } catch (error: any) {
     console.error('Error listing backups:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    // Return empty array on error instead of error object
+    res.json([]);
   }
 });
 

@@ -110,7 +110,7 @@ export default function Layout() {
         </nav>
 
         {/* User */}
-        <div className="p-3 border-t border-slate-800">
+        <div className="p-3 border-t border-slate-800 space-y-2">
           <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
             <div className="avatar-cyan flex-shrink-0">
               {user?.name?.charAt(0) || user?.username?.charAt(0) || 'U'}
@@ -119,14 +119,14 @@ export default function Layout() {
               <p className="text-sm font-medium text-white truncate">{user?.name || user?.username}</p>
               <p className="text-xs text-slate-500 truncate capitalize">{user?.role?.replace('_', ' ')}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-red-400 transition-colors"
-              title="Chiqish"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 text-red-400 hover:text-red-300 transition-colors border border-red-600/30"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm font-medium">Chiqish</span>
+          </button>
         </div>
       </aside>
 

@@ -1,10 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, Search, Phone, CheckCircle, XCircle, X, Download } from "lucide-react";
+import { DollarSign, Search, Phone, CheckCircle, XCircle, X, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBranchContext } from "@/hooks/useBranchContext";
 import api from "@/lib/axios";
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 interface Student {
   _id: string;
@@ -21,6 +25,7 @@ interface Student {
 
 export default function Payments() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [exportFormat, setExportFormat] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedBranch } = useBranchContext();
@@ -54,6 +59,7 @@ export default function Payments() {
 
   const exportToExcel = () => {
     try {
+      const currentDay = new Date().getDate();
       // Ma'lumotlarni tayyorlash
       const exportData = filteredStudents.map((student, index) => ({
         '№': index + 1,
@@ -67,42 +73,193 @@ export default function Payments() {
                 currentDay <= 10 ? '⏳ Kutilmoqda' : '❌ Muddat o\'tgan'
       }));
 
-      // Excel fayl yaratish
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       
-      // Ustun kengliklarini sozlash
       const columnWidths = [
-        { wch: 5 },   // №
-        { wch: 20 },  // Ism
-        { wch: 15 },  // Telefon
-        { wch: 12 },  // Oylik to'lov
-        { wch: 15 },  // To'lov holati
-        { wch: 15 },  // Oxirgi to'lov
-        { wch: 12 },  // Bloklangan
-        { wch: 15 }   // Holat
+        { wch: 5 }, { wch: 20 }, { wch: 15 }, { wch: 12 },
+        { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }
       ];
       worksheet['!cols'] = columnWidths;
 
       XLSX.utils.book_append_sheet(workbook, worksheet, 'To\'lovlar');
       
-      // Fayl nomini yaratish
       const currentDate = new Date().toLocaleDateString('uz-UZ').replace(/\./g, '-');
       const branchName = selectedBranch?.name ? selectedBranch.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Barcha_filiallar';
       const fileName = `Tolovlar_${branchName}_${currentDate}.xlsx`;
       
-      // Faylni yuklab olish
       XLSX.writeFile(workbook, fileName);
-      
-      toast({
-        title: "Muvaffaqiyat!",
-        description: `Excel fayl yuklab olindi: ${fileName}`
-      });
     } catch (error) {
       console.error('Excel export error:', error);
       toast({
         title: "Xatolik!",
         description: "Excel faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF('l', 'mm', 'a4');
+      const currentDay = new Date().getDate();
+      
+      doc.setFontSize(14);
+      doc.text("To'lovlar ro'yxati", 14, 12);
+      
+      doc.setFontSize(9);
+      const branchName = selectedBranch?.name || 'Barcha filiallar';
+      const currentDate = new Date().toLocaleDateString('uz-UZ');
+      doc.text(`Filial: ${branchName}`, 14, 18);
+      doc.text(`Sana: ${currentDate}`, 100, 18);
+      doc.text(`Jami: ${filteredStudents.length} ta`, 180, 18);
+      
+      const tableData = filteredStudents.map((student, index) => [
+        index + 1,
+        student.name || '',
+        student.phone || '',
+        (student.monthly_fee || 0).toLocaleString(),
+        student.current_month_payment === 'paid' ? "To'langan" : "To'lanmagan",
+        student.last_payment_date ? new Date(student.last_payment_date).toLocaleDateString('uz-UZ') : '-',
+        student.is_blocked ? 'Ha' : "Yo'q",
+        student.current_month_payment === 'paid' ? 'OK' : 
+        currentDay <= 10 ? 'Kutish' : 'Kech'
+      ]);
+
+      autoTable(doc, {
+        startY: 22,
+        head: [['№', 'Ism', 'Telefon', "To'lov", 'Holat', 'Oxirgi', 'Blok', 'Status']],
+        body: tableData,
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.5,
+          overflow: 'linebreak',
+          halign: 'left',
+          valign: 'middle'
+        },
+        headStyles: {
+          fillColor: [34, 197, 94],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center',
+          fontSize: 7
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 20, halign: 'right' },
+          4: { cellWidth: 25, halign: 'center' },
+          5: { cellWidth: 22, halign: 'center' },
+          6: { cellWidth: 15, halign: 'center' },
+          7: { cellWidth: 20, halign: 'center' }
+        },
+        margin: { top: 22, left: 10, right: 10, bottom: 10 },
+        didDrawPage: (data: any) => {
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(7);
+          doc.text(
+            `Sahifa ${data.pageNumber} / ${pageCount}`,
+            doc.internal.pageSize.width / 2,
+            doc.internal.pageSize.height - 5,
+            { align: 'center' }
+          );
+        }
+      });
+
+      const fileName = `Tolovlar_${branchName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate.replace(/\./g, '-')}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "PDF faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToPNG = async () => {
+    try {
+      const tableContainer = document.createElement('div');
+      tableContainer.style.position = 'absolute';
+      tableContainer.style.left = '-9999px';
+      tableContainer.style.background = 'white';
+      tableContainer.style.padding = '30px';
+      
+      const branchName = selectedBranch?.name || 'Barcha filiallar';
+      const currentDate = new Date().toLocaleDateString('uz-UZ');
+      const currentDay = new Date().getDate();
+      
+      tableContainer.innerHTML = `
+        <div style="font-family: Arial, sans-serif; width: 1600px;">
+          <h2 style="color: #22c55e; margin-bottom: 15px; font-size: 32px;">To'lovlar ro'yxati</h2>
+          <div style="display: flex; gap: 40px; margin-bottom: 20px; color: #475569; font-size: 18px;">
+            <span>Filial: <strong style="color: #1e293b;">${branchName}</strong></span>
+            <span>Sana: <strong style="color: #1e293b;">${currentDate}</strong></span>
+            <span>Jami: <strong style="color: #1e293b;">${filteredStudents.length} ta</strong></span>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 18px;">
+            <thead>
+              <tr style="background: #22c55e; color: white;">
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">№</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Ism</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Telefon</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: right; font-size: 18px;">Oylik to'lov</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">To'lov holati</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Oxirgi to'lov</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Blok</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredStudents.map((student, index) => {
+                const bgColor = index % 2 === 0 ? '#f1f5f9' : 'white';
+                const isPaid = student.current_month_payment === 'paid';
+                const status = isPaid ? '✅ OK' : currentDay <= 10 ? '⏳ Kutish' : '❌ Kech';
+                
+                return `
+                  <tr style="background: ${bgColor};">
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${index + 1}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-weight: 700; font-size: 18px;">${student.name || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-size: 18px; font-weight: 600;">${student.phone || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: right; color: #1e293b; font-size: 18px; font-weight: 600;">${(student.monthly_fee || 0).toLocaleString()}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: ${isPaid ? '#22c55e' : '#ef4444'}; font-size: 18px; font-weight: 700;">${isPaid ? "To'langan" : "To'lanmagan"}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.last_payment_date ? new Date(student.last_payment_date).toLocaleDateString('uz-UZ') : '-'}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.is_blocked ? 'Ha' : "Yo'q"}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${status}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.body.appendChild(tableContainer);
+      
+      const canvas = await html2canvas(tableContainer, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      const link = document.createElement('a');
+      link.download = `Tolovlar_${branchName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate.replace(/\./g, '-')}.png`;
+      link.href = imgData;
+      link.click();
+      
+      document.body.removeChild(tableContainer);
+    } catch (error) {
+      console.error('PNG export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "PNG faylni yaratishda xatolik yuz berdi",
         variant: "destructive"
       });
     }
@@ -144,16 +301,43 @@ export default function Payments() {
           </div>
         </div>
         <div className="flex gap-3">
-          {/* Excel Export tugmasi */}
-          <button
-            onClick={exportToExcel}
-            disabled={filteredStudents.length === 0}
-            className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Excel'ga export qilish"
-          >
-            <Download className="w-4 h-4" />
-            <span className="text-xs">Excel</span>
-          </button>
+          {/* Export Select */}
+          <Select value={exportFormat} onValueChange={(value) => {
+            setExportFormat(value);
+            setTimeout(() => {
+              if (value === 'excel') exportToExcel();
+              else if (value === 'pdf') exportToPDF();
+              else if (value === 'png') exportToPNG();
+              setExportFormat("");
+            }, 100);
+          }}>
+            <SelectTrigger className="input w-40">
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                <span>Yuklash</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent className="card border-slate-700">
+              <SelectItem value="excel">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                  <span>Excel</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="pdf">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-red-400" />
+                  <span>PDF</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="png">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-400" />
+                  <span>PNG Rasm</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <div className="px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
             <span className="text-xs text-green-400">To'langan: {paidCount}</span>
           </div>

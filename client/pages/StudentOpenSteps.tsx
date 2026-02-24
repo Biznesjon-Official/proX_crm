@@ -1,10 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, TrendingUp, Award, Search, RefreshCw, TrendingDown, Download } from "lucide-react";
+import { Users, TrendingUp, Award, Search, RefreshCw, TrendingDown, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useBranchContext } from "@/hooks/useBranchContext";
 import api from "@/lib/axios";
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 interface StudentStep {
   _id: string;
@@ -21,6 +25,7 @@ export default function StudentOpenSteps() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"currentStep" | "progress">("currentStep");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [exportFormat, setExportFormat] = useState<string>("");
   const { selectedBranch } = useBranchContext();
   const { toast } = useToast();
 
@@ -129,16 +134,179 @@ export default function StudentOpenSteps() {
       
       // Faylni yuklab olish
       XLSX.writeFile(workbook, fileName);
-      
-      toast({
-        title: "Muvaffaqiyat!",
-        description: `Excel fayl yuklab olindi: ${fileName}`
-      });
     } catch (error) {
       console.error('Excel export error:', error);
       toast({
         title: "Xatolik!",
         description: "Excel faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF('l', 'mm', 'a4');
+      
+      doc.setFontSize(14);
+      doc.text("O'quvchilar qadamlari", 14, 12);
+      
+      doc.setFontSize(9);
+      const branchName = selectedBranch?.name || 'Barcha filiallar';
+      const currentDate = new Date().toLocaleDateString('uz-UZ');
+      doc.text(`Filial: ${branchName}`, 14, 18);
+      doc.text(`Sana: ${currentDate}`, 100, 18);
+      doc.text(`Jami: ${sortedStudents.length} ta`, 180, 18);
+      
+      const tableData = sortedStudents.map((student, index) => [
+        index + 1,
+        student.fullName || '',
+        student.login || '',
+        student.currentStep || 0,
+        student.step || 0,
+        (student.step || 0) - (student.currentStep || 0),
+        student.totalBall || 0,
+        `${student.progress || 0}%`,
+        student.currentStep === 0 ? 'Boshlamagan' : 
+        student.currentStep >= student.step ? 'Yaxshi' : 'Orqada'
+      ]);
+
+      autoTable(doc, {
+        startY: 22,
+        head: [['№', 'Ism', 'Login', 'Hozirgi', 'Jami', 'Farq', 'Ball', 'Progress', 'Holat']],
+        body: tableData,
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.5,
+          overflow: 'linebreak',
+          halign: 'left',
+          valign: 'middle'
+        },
+        headStyles: {
+          fillColor: [14, 165, 233],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center',
+          fontSize: 7
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 18, halign: 'center' },
+          5: { cellWidth: 15, halign: 'center' },
+          6: { cellWidth: 15, halign: 'center' },
+          7: { cellWidth: 20, halign: 'center' },
+          8: { cellWidth: 25, halign: 'center' }
+        },
+        margin: { top: 22, left: 10, right: 10, bottom: 10 },
+        didDrawPage: (data: any) => {
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(7);
+          doc.text(
+            `Sahifa ${data.pageNumber} / ${pageCount}`,
+            doc.internal.pageSize.width / 2,
+            doc.internal.pageSize.height - 5,
+            { align: 'center' }
+          );
+        }
+      });
+
+      const fileName = `Oquvchilar_qadamlari_${branchName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate.replace(/\./g, '-')}.pdf`;
+      doc.save(fileName);
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "PDF faylni yaratishda xatolik yuz berdi",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportToPNG = async () => {
+    try {
+      const tableContainer = document.createElement('div');
+      tableContainer.style.position = 'absolute';
+      tableContainer.style.left = '-9999px';
+      tableContainer.style.background = 'white';
+      tableContainer.style.padding = '30px';
+      
+      const branchName = selectedBranch?.name || 'Barcha filiallar';
+      const currentDate = new Date().toLocaleDateString('uz-UZ');
+      
+      tableContainer.innerHTML = `
+        <div style="font-family: Arial, sans-serif; width: 1600px;">
+          <h2 style="color: #0ea5e9; margin-bottom: 15px; font-size: 32px;">O'quvchilar qadamlari</h2>
+          <div style="display: flex; gap: 40px; margin-bottom: 20px; color: #475569; font-size: 18px;">
+            <span>Filial: <strong style="color: #1e293b;">${branchName}</strong></span>
+            <span>Sana: <strong style="color: #1e293b;">${currentDate}</strong></span>
+            <span>Jami: <strong style="color: #1e293b;">${sortedStudents.length} ta</strong></span>
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 18px;">
+            <thead>
+              <tr style="background: #0ea5e9; color: white;">
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">№</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Ism</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; font-size: 18px;">Login</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Hozirgi qadam</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Jami qadam</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Farq</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Ball</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Progress</th>
+                <th style="border: 2px solid #94a3b8; padding: 14px; text-align: center; font-size: 18px;">Holat</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sortedStudents.map((student, index) => {
+                const bgColor = index % 2 === 0 ? '#f1f5f9' : 'white';
+                const holat = student.currentStep === 0 ? 'Boshlamagan' : 
+                             student.currentStep >= student.step ? 'Yaxshi' : 'Orqada qolgan';
+                
+                return `
+                  <tr style="background: ${bgColor};">
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${index + 1}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-weight: 700; font-size: 18px;">${student.fullName || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; color: #1e293b; font-size: 18px; font-weight: 600;">${student.login || ''}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.currentStep || 0}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.step || 0}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${(student.step || 0) - (student.currentStep || 0)}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.totalBall || 0}</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${student.progress || 0}%</td>
+                    <td style="border: 2px solid #cbd5e1; padding: 12px; text-align: center; color: #1e293b; font-size: 18px; font-weight: 600;">${holat}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.body.appendChild(tableContainer);
+      
+      const canvas = await html2canvas(tableContainer, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      const link = document.createElement('a');
+      link.download = `Oquvchilar_qadamlari_${branchName.replace(/[^a-zA-Z0-9]/g, '_')}_${currentDate.replace(/\./g, '-')}.png`;
+      link.href = imgData;
+      link.click();
+      
+      document.body.removeChild(tableContainer);
+    } catch (error) {
+      console.error('PNG export error:', error);
+      toast({
+        title: "Xatolik!",
+        description: "PNG faylni yaratishda xatolik yuz berdi",
         variant: "destructive"
       });
     }
@@ -166,16 +334,43 @@ export default function StudentOpenSteps() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* Excel Export tugmasi */}
-          <button
-            onClick={exportToExcel}
-            disabled={sortedStudents.length === 0}
-            className="p-2 sm:px-3 sm:py-2 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg hover:bg-green-500/30 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Excel'ga export qilish"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline text-sm">Excel</span>
-          </button>
+          {/* Export Select */}
+          <Select value={exportFormat} onValueChange={(value) => {
+            setExportFormat(value);
+            setTimeout(() => {
+              if (value === 'excel') exportToExcel();
+              else if (value === 'pdf') exportToPDF();
+              else if (value === 'png') exportToPNG();
+              setExportFormat("");
+            }, 100);
+          }}>
+            <SelectTrigger className="input w-40">
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                <span>Yuklash</span>
+              </div>
+            </SelectTrigger>
+            <SelectContent className="card border-slate-700">
+              <SelectItem value="excel">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                  <span>Excel</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="pdf">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-red-400" />
+                  <span>PDF</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="png">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-400" />
+                  <span>PNG Rasm</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <button
             onClick={() => refetch()}
             className="p-2 sm:px-3 sm:py-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/30 transition flex items-center gap-2"
@@ -240,7 +435,7 @@ export default function StudentOpenSteps() {
       </div>
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative w-full sm:w-[30%]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         <input
           type="text"
